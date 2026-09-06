@@ -71,7 +71,7 @@ fun ThemeSettingsScreen(
             Spacer(Modifier.height(8.dp))
             AppearanceOptions(
                 selected = settingsViewModel.themeMode,
-                onSelect = settingsViewModel::setThemeMode
+                onSelect = settingsViewModel::updateThemeMode
             )
 
             Spacer(Modifier.height(28.dp))
@@ -81,7 +81,7 @@ fun ThemeSettingsScreen(
             FolderColorGrid(
                 selected = settingsViewModel.defaultFolderColor,
                 isDarkTheme = isDarkTheme,
-                onSelect = settingsViewModel::setDefaultFolderColor
+                onSelect = settingsViewModel::updateFolderColor
             )
 
             Spacer(Modifier.height(20.dp))
