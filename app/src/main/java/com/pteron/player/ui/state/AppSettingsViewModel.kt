@@ -25,11 +25,7 @@ class AppSettingsViewModel : ViewModel() {
     var defaultFolderColor by mutableStateOf(FolderColor.Default)
         private set
 
-    fun setThemeMode(mode: AppThemeMode) {
-        themeMode = mode
-    }
+    fun updateThemeMode(mode: AppThemeMode) { themeMode = mode }
 
-    fun setDefaultFolderColor(color: FolderColor) {
-        defaultFolderColor = color
-    }
+    fun updateFolderColor(color: FolderColor) { defaultFolderColor = color }
 }
