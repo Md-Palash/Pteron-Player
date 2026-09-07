@@ -7,12 +7,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -20,20 +18,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
-enum class SeekFlashSide { NONE, LEFT, RIGHT }
+enum class SeekFlashSide {
+    NONE,
+    LEFT,
+    RIGHT
+}
 
-/**
- * Transparent gesture-capture layer placed above the video surface and below
- * the visible controls. Handles:
- *  - single tap: toggles control visibility
- *  - double tap left/right third: -10s / +10s seek with a brief flash
- *  - vertical drag on the left half: screen brightness
- *  - vertical drag on the right half: media volume
- *  - horizontal drag: scrub preview, committed on release
- *
- * All drag magnitudes are scaled by [sensitivity] (0.5x precise .. 2.0x fast),
- * persisted from Settings.
- */
 @Composable
 fun GestureOverlay(
     modifier: Modifier = Modifier,
@@ -49,20 +39,23 @@ fun GestureOverlay(
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
+
     val audioManager = remember {
         context.getSystemService(AudioManager::class.java)
     }
+
     val scope = rememberCoroutineScope()
 
-    var scrubTargetMs by remember {
+    // Use explicit .value / .floatValue instead of Compose "by" delegates.
+    val scrubTargetMs = remember {
         mutableFloatStateOf(0f)
     }
 
-    var isScrubbing by remember {
+    val isScrubbing = remember {
         mutableStateOf(false)
     }
 
-    var dragStartedOnLeftHalf by remember {
+    val dragStartedOnLeftHalf = remember {
         mutableStateOf(true)
     }
 
@@ -70,7 +63,9 @@ fun GestureOverlay(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(locked) {
-                if (locked) return@pointerInput
+                if (locked) {
+                    return@pointerInput
+                }
 
                 detectTapGestures(
                     onTap = {
@@ -85,7 +80,7 @@ fun GestureOverlay(
                                 onFlash(SeekFlashSide.LEFT)
                             }
 
-                            offset.x > third * 2 -> {
+                            offset.x > third * 2f -> {
                                 onSeekBy(10_000L)
                                 onFlash(SeekFlashSide.RIGHT)
                             }
@@ -104,33 +99,39 @@ fun GestureOverlay(
                 durationMs,
                 currentPositionMs
             ) {
-                if (locked) return@pointerInput
+                if (locked) {
+                    return@pointerInput
+                }
 
                 detectDragGestures(
                     onDragStart = { offset ->
-                        scrubTargetMs = currentPositionMs.toFloat()
+                        scrubTargetMs.floatValue =
+                            currentPositionMs.toFloat()
 
-                        dragStartedOnLeftHalf =
+                        dragStartedOnLeftHalf.value =
                             offset.x < size.width / 2f
 
-                        isScrubbing = false
+                        isScrubbing.value = false
                     },
 
                     onDragEnd = {
-                        if (isScrubbing) {
-                            onScrubCommit(scrubTargetMs.toLong())
+                        if (isScrubbing.value) {
+                            onScrubCommit(
+                                scrubTargetMs.floatValue.toLong()
+                            )
+
                             onScrubPreview(null)
                         }
 
-                        isScrubbing = false
+                        isScrubbing.value = false
                     },
 
                     onDragCancel = {
-                        if (isScrubbing) {
+                        if (isScrubbing.value) {
                             onScrubPreview(null)
                         }
 
-                        isScrubbing = false
+                        isScrubbing.value = false
                     },
 
                     onDrag = { change, dragAmount ->
@@ -138,41 +139,43 @@ fun GestureOverlay(
 
                         val isHorizontalGesture =
                             abs(dragAmount.x) >
-                                abs(dragAmount.y) * 1.3f
+                                    abs(dragAmount.y) * 1.3f
 
                         if (isHorizontalGesture && durationMs > 0) {
-                            isScrubbing = true
+
+                            isScrubbing.value = true
 
                             val widthPx =
                                 size.width.takeIf { it > 0 } ?: 1
 
-                            // Full-width drag covers roughly 2 minutes
-                            // of footage at 1.0x sensitivity.
+                            // Full-width drag ≈ 2 minutes at 1.0x sensitivity.
                             val msPerPx =
                                 (120_000f / widthPx) * sensitivity
 
                             val deltaMs =
                                 dragAmount.x * msPerPx
 
-                            scrubTargetMs =
+                            scrubTargetMs.floatValue =
                                 (
-                                    scrubTargetMs + deltaMs
+                                    scrubTargetMs.floatValue + deltaMs
                                 ).coerceIn(
                                     0f,
                                     durationMs.toFloat()
                                 )
 
                             onScrubPreview(
-                                scrubTargetMs.toLong()
+                                scrubTargetMs.floatValue.toLong()
                             )
+
                         } else if (!isHorizontalGesture) {
+
                             val heightPx =
                                 size.height.takeIf { it > 0 } ?: 1
 
                             val fraction =
                                 (dragAmount.y / heightPx) * sensitivity
 
-                            if (dragStartedOnLeftHalf) {
+                            if (dragStartedOnLeftHalf.value) {
                                 adjustBrightness(
                                     activity,
                                     -fraction
@@ -222,7 +225,7 @@ private fun adjustVolume(
         am.getStreamVolume(AudioManager.STREAM_MUSIC)
 
     val target =
-        (current + (delta * max))
+        (current + delta * max)
             .toInt()
             .coerceIn(0, max)
 
