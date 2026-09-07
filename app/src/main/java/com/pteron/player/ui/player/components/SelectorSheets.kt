@@ -1,6 +1,6 @@
 package com.pteron.player.ui.player.components
 
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -17,19 +17,27 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.pointer.PointerInputScope
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.pteron.player.ui.player.TrackOption
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AudioTrackSheet(
-    tracks: List<TrackOption>,
-    selectedTrack: TrackOption?,
-    onTrackSelected: (TrackOption) -> Unit,
+fun SpeedSelectorSheet(
+    currentSpeed: Float,
+    onSelect: (Float) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val speeds = listOf(
+        0.25f,
+        0.5f,
+        0.75f,
+        1.0f,
+        1.25f,
+        1.5f,
+        1.75f,
+        2.0f
+    )
+
     ModalBottomSheet(
         onDismissRequest = onDismiss
     ) {
@@ -39,7 +47,7 @@ fun AudioTrackSheet(
                 .padding(bottom = 16.dp)
         ) {
             Text(
-                text = "Audio Track",
+                text = "Playback speed",
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(
                     horizontal = 16.dp,
@@ -48,21 +56,27 @@ fun AudioTrackSheet(
             )
 
             LazyColumn {
-                items(tracks) { track ->
+                items(speeds) { speed ->
                     ListItem(
                         headlineContent = {
-                            Text(track.label)
+                            Text(
+                                text = if (speed == 1.0f) {
+                                    "1.0x (Normal)"
+                                } else {
+                                    "${speed}x"
+                                }
+                            )
                         },
                         trailingContent = {
-                            if (track == selectedTrack) {
+                            if (speed == currentSpeed) {
                                 Icon(
                                     imageVector = Icons.Filled.Check,
                                     contentDescription = "Selected"
                                 )
                             }
                         },
-                        modifier = Modifier.detectTapAndSelect {
-                            onTrackSelected(track)
+                        modifier = Modifier.clickable {
+                            onSelect(speed)
                         }
                     )
                 }
@@ -73,10 +87,11 @@ fun AudioTrackSheet(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SubtitleTrackSheet(
+fun TrackSelectorSheet(
+    title: String,
     tracks: List<TrackOption>,
-    selectedTrack: TrackOption?,
-    onTrackSelected: (TrackOption) -> Unit,
+    allowDisable: Boolean,
+    onSelect: (TrackOption?) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
@@ -88,7 +103,7 @@ fun SubtitleTrackSheet(
                 .padding(bottom = 16.dp)
         ) {
             Text(
-                text = "Subtitles",
+                text = title,
                 style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(
                     horizontal = 16.dp,
@@ -97,34 +112,31 @@ fun SubtitleTrackSheet(
             )
 
             LazyColumn {
-                item {
-                    ListItem(
-                        leadingContent = {
-                            Icon(
-                                imageVector = Icons.Filled.SubtitlesOff,
-                                contentDescription = "Subtitles off"
-                            )
-                        },
-                        headlineContent = {
-                            Text("Off")
-                        },
-                        trailingContent = {
-                            if (selectedTrack == null) {
+                if (allowDisable) {
+                    item {
+                        ListItem(
+                            leadingContent = {
                                 Icon(
-                                    imageVector = Icons.Filled.Check,
-                                    contentDescription = "Selected"
+                                    imageVector = Icons.Filled.SubtitlesOff,
+                                    contentDescription = "Subtitles off"
                                 )
+                            },
+                            headlineContent = {
+                                Text("Off")
+                            },
+                            trailingContent = {
+                                if (tracks.none { it.isSelected }) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = "Selected"
+                                    )
+                                }
+                            },
+                            modifier = Modifier.clickable {
+                                onSelect(null)
                             }
-                        },
-                        modifier = Modifier.detectTapAndSelect {
-                            onTrackSelected(
-                                TrackOption(
-                                    id = -1,
-                                    label = "Off"
-                                )
-                            )
-                        }
-                    )
+                        )
+                    }
                 }
 
                 items(tracks) { track ->
@@ -133,31 +145,19 @@ fun SubtitleTrackSheet(
                             Text(track.label)
                         },
                         trailingContent = {
-                            if (track == selectedTrack) {
+                            if (track.isSelected) {
                                 Icon(
                                     imageVector = Icons.Filled.Check,
                                     contentDescription = "Selected"
                                 )
                             }
                         },
-                        modifier = Modifier.detectTapAndSelect {
-                            onTrackSelected(track)
+                        modifier = Modifier.clickable {
+                            onSelect(track)
                         }
                     )
                 }
             }
         }
     }
-}
-
-private fun Modifier.detectTapAndSelect(
-    onSelect: () -> Unit
-): Modifier {
-    return this.then(
-        Modifier.pointerInput(Unit) {
-            detectTapGestures {
-                onSelect()
-            }
-        }
-    )
 }
