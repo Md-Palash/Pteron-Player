@@ -1,5 +1,6 @@
 package com.pteron.player.ui.player.components
 
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -21,25 +22,58 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.pteron.player.ui.player.TrackOption
 
-private val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
+private val speedOptions = listOf(
+    0.5f,
+    0.75f,
+    1.0f,
+    1.25f,
+    1.5f,
+    1.75f,
+    2.0f
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeedSelectorSheet(currentSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+fun SpeedSelectorSheet(
+    currentSpeed: Float,
+    onSelect: (Float) -> Unit,
+    onDismiss: () -> Unit
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.padding(bottom = 24.dp)
+        ) {
             Text(
-                "Playback speed",
+                text = "Playback speed",
                 style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp)
+                modifier = Modifier.padding(
+                    horizontal = 20.dp,
+                    vertical = 8.dp
+                )
             )
+
             speedOptions.forEach { speed ->
                 ListItem(
-                    headlineContent = { Text("${speed}x") },
-                    trailingContent = { if (speed == currentSpeed) Icon(Icons.Filled.Check, contentDescription = null) },
+                    headlineContent = {
+                        Text("${speed}x")
+                    },
+                    trailingContent = {
+                        if (speed == currentSpeed) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null
+                            )
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(speed) { detectTapAndSelect { onSelect(speed) } }
+                        .pointerInput(speed) {
+                            detectTapAndSelect {
+                                onSelect(speed)
+                            }
+                        }
                 )
             }
         }
@@ -55,35 +89,77 @@ fun TrackSelectorSheet(
     onSelect: (TrackOption?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
-        Column(modifier = Modifier.padding(bottom = 24.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp))
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.padding(bottom = 24.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(
+                    horizontal = 20.dp,
+                    vertical = 8.dp
+                )
+            )
+
             if (tracks.isEmpty()) {
                 Text(
-                    "No tracks available for this video.",
+                    text = "No tracks available for this video.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(
+                        horizontal = 20.dp,
+                        vertical = 12.dp
+                    )
                 )
+
                 return@Column
             }
+
             if (allowDisable) {
                 ListItem(
-                    headlineContent = { Text("Off") },
-                    leadingContent = { Icon(Icons.Filled.SubtitlesOff, contentDescription = null) },
+                    headlineContent = {
+                        Text("Off")
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Filled.SubtitlesOff,
+                            contentDescription = null
+                        )
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .pointerInput(Unit) { detectTapAndSelect { onSelect(null) } }
+                        .pointerInput(Unit) {
+                            detectTapAndSelect {
+                                onSelect(null)
+                            }
+                        }
                 )
             }
+
             LazyColumn {
                 items(tracks) { track ->
                     ListItem(
-                        headlineContent = { Text(track.label) },
-                        trailingContent = { if (track.isSelected) Icon(Icons.Filled.Check, contentDescription = null) },
+                        headlineContent = {
+                            Text(track.label)
+                        },
+                        trailingContent = {
+                            if (track.isSelected) {
+                                Icon(
+                                    Icons.Filled.Check,
+                                    contentDescription = null
+                                )
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .pointerInput(track) { detectTapAndSelect { onSelect(track) } }
+                            .pointerInput(track) {
+                                detectTapAndSelect {
+                                    onSelect(track)
+                                }
+                            }
                     )
                 }
             }
@@ -91,6 +167,10 @@ fun TrackSelectorSheet(
     }
 }
 
-private suspend fun PointerInputScope.detectTapAndSelect(onSelect: () -> Unit) {
-    androidx.compose.foundation.gestures.detectTapGestures { onSelect() }
+private suspend fun PointerInputScope.detectTapAndSelect(
+    onSelect: () -> Unit
+) {
+    detectTapGestures {
+        onSelect()
+    }
 }
