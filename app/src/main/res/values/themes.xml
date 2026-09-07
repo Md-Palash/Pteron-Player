@@ -1,5 +1,0 @@
-<resources>
-    <!-- The whole UI is Compose; this base theme just prevents a system
-         default flash before setContent() runs. -->
-    <style name="Theme.Pteron" parent="android:Theme.Material.Light.NoActionBar" />
-</resources>
