@@ -22,122 +22,30 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.pteron.player.ui.player.TrackOption
 
-private val speedOptions = listOf(
-    0.5f,
-    0.75f,
-    1.0f,
-    1.25f,
-    1.5f,
-    1.75f,
-    2.0f
-)
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SpeedSelectorSheet(
-    currentSpeed: Float,
-    onSelect: (Float) -> Unit,
-    onDismiss: () -> Unit
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss
-    ) {
-        Column(
-            modifier = Modifier.padding(bottom = 24.dp)
-        ) {
-            Text(
-                text = "Playback speed",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(
-                    horizontal = 20.dp,
-                    vertical = 8.dp
-                )
-            )
-
-            speedOptions.forEach { speed ->
-                ListItem(
-                    headlineContent = {
-                        Text("${speed}x")
-                    },
-                    trailingContent = {
-                        if (speed == currentSpeed) {
-                            Icon(
-                                Icons.Filled.Check,
-                                contentDescription = null
-                            )
-                        }
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(speed) {
-                            detectTapAndSelect {
-                                onSelect(speed)
-                            }
-                        }
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun TrackSelectorSheet(
-    title: String,
+fun AudioTrackSheet(
     tracks: List<TrackOption>,
-    allowDisable: Boolean,
-    onSelect: (TrackOption?) -> Unit,
+    selectedTrack: TrackOption?,
+    onTrackSelected: (TrackOption) -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss
     ) {
         Column(
-            modifier = Modifier.padding(bottom = 24.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
         ) {
             Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
+                text = "Audio Track",
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(
-                    horizontal = 20.dp,
-                    vertical = 8.dp
+                    horizontal = 16.dp,
+                    vertical = 12.dp
                 )
             )
-
-            if (tracks.isEmpty()) {
-                Text(
-                    text = "No tracks available for this video.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(
-                        horizontal = 20.dp,
-                        vertical = 12.dp
-                    )
-                )
-
-                return@Column
-            }
-
-            if (allowDisable) {
-                ListItem(
-                    headlineContent = {
-                        Text("Off")
-                    },
-                    leadingContent = {
-                        Icon(
-                            Icons.Filled.SubtitlesOff,
-                            contentDescription = null
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            detectTapAndSelect {
-                                onSelect(null)
-                            }
-                        }
-                )
-            }
 
             LazyColumn {
                 items(tracks) { track ->
@@ -146,20 +54,16 @@ fun TrackSelectorSheet(
                             Text(track.label)
                         },
                         trailingContent = {
-                            if (track.isSelected) {
+                            if (track == selectedTrack) {
                                 Icon(
-                                    Icons.Filled.Check,
-                                    contentDescription = null
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected"
                                 )
                             }
                         },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .pointerInput(track) {
-                                detectTapAndSelect {
-                                    onSelect(track)
-                                }
-                            }
+                        modifier = Modifier.detectTapAndSelect {
+                            onTrackSelected(track)
+                        }
                     )
                 }
             }
@@ -167,10 +71,93 @@ fun TrackSelectorSheet(
     }
 }
 
-private suspend fun PointerInputScope.detectTapAndSelect(
-    onSelect: () -> Unit
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SubtitleTrackSheet(
+    tracks: List<TrackOption>,
+    selectedTrack: TrackOption?,
+    onTrackSelected: (TrackOption) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    detectTapGestures {
-        onSelect()
+    ModalBottomSheet(
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 16.dp)
+        ) {
+            Text(
+                text = "Subtitles",
+                style = MaterialTheme.typography.titleLarge,
+                modifier = Modifier.padding(
+                    horizontal = 16.dp,
+                    vertical = 12.dp
+                )
+            )
+
+            LazyColumn {
+                item {
+                    ListItem(
+                        leadingContent = {
+                            Icon(
+                                imageVector = Icons.Filled.SubtitlesOff,
+                                contentDescription = "Subtitles off"
+                            )
+                        },
+                        headlineContent = {
+                            Text("Off")
+                        },
+                        trailingContent = {
+                            if (selectedTrack == null) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected"
+                                )
+                            }
+                        },
+                        modifier = Modifier.detectTapAndSelect {
+                            onTrackSelected(
+                                TrackOption(
+                                    id = -1,
+                                    label = "Off"
+                                )
+                            )
+                        }
+                    )
+                }
+
+                items(tracks) { track ->
+                    ListItem(
+                        headlineContent = {
+                            Text(track.label)
+                        },
+                        trailingContent = {
+                            if (track == selectedTrack) {
+                                Icon(
+                                    imageVector = Icons.Filled.Check,
+                                    contentDescription = "Selected"
+                                )
+                            }
+                        },
+                        modifier = Modifier.detectTapAndSelect {
+                            onTrackSelected(track)
+                        }
+                    )
+                }
+            }
+        }
     }
+}
+
+private fun Modifier.detectTapAndSelect(
+    onSelect: () -> Unit
+): Modifier {
+    return this.then(
+        Modifier.pointerInput(Unit) {
+            detectTapGestures {
+                onSelect()
+            }
+        }
+    )
 }
