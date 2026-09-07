@@ -34,10 +34,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pteron.player.util.formatRemaining
@@ -61,28 +67,50 @@ fun PlayerTopBar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack) {
-            Icon(Icons.Filled.ArrowBack, contentDescription = "Exit player", tint = Color.White)
+            Icon(
+                Icons.Filled.ArrowBack,
+                contentDescription = "Exit player",
+                tint = Color.White
+            )
         }
+
         Text(
             text = title,
             color = Color.White,
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+            modifier = Modifier
+                .weight(1f)
+                .padding(horizontal = 4.dp)
         )
+
         IconButton(onClick = onToggleFavorite) {
             Icon(
-                imageVector = if (isFavorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                imageVector = if (isFavorite) {
+                    Icons.Filled.Favorite
+                } else {
+                    Icons.Filled.FavoriteBorder
+                },
                 contentDescription = "Favorite",
                 tint = Color.White
             )
         }
+
         IconButton(onClick = onOpenAudioTracks) {
-            Icon(Icons.Filled.Speed, contentDescription = "Audio track", tint = Color.White)
+            Icon(
+                Icons.Filled.Speed,
+                contentDescription = "Audio track",
+                tint = Color.White
+            )
         }
+
         IconButton(onClick = onOpenSubtitleTracks) {
-            Icon(Icons.Filled.Subtitles, contentDescription = "Subtitles", tint = Color.White)
+            Icon(
+                Icons.Filled.Subtitles,
+                contentDescription = "Subtitles",
+                tint = Color.White
+            )
         }
     }
 }
@@ -123,25 +151,60 @@ fun PlayerBottomBar(
             accentColor = accentColor,
             onScrub = onScrub
         )
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(formatTimecode(currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
-            Text(formatRemaining(durationMs - currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+            Text(
+                formatTimecode(currentPositionMs),
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            Text(
+                formatRemaining(
+                    (durationMs - currentPositionMs).coerceAtLeast(0L)
+                ),
+                color = Color.White.copy(alpha = 0.85f),
+                style = MaterialTheme.typography.bodySmall
+            )
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.Center,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPrevious, enabled = hasPrevious) {
-                Icon(Icons.Filled.SkipPrevious, contentDescription = "Previous", tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.3f))
+            IconButton(
+                onClick = onPrevious,
+                enabled = hasPrevious
+            ) {
+                Icon(
+                    Icons.Filled.SkipPrevious,
+                    contentDescription = "Previous",
+                    tint = if (hasPrevious) {
+                        Color.White
+                    } else {
+                        Color.White.copy(alpha = 0.3f)
+                    }
+                )
             }
-            IconButton(onClick = { onSeekBy(-10_000L) }) {
-                Icon(Icons.Filled.Replay10, contentDescription = "Rewind 10 seconds", tint = Color.White)
+
+            IconButton(
+                onClick = {
+                    onSeekBy(-10_000L)
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Replay10,
+                    contentDescription = "Rewind 10 seconds",
+                    tint = Color.White
+                )
             }
+
             Box(
                 modifier = Modifier
                     .padding(horizontal = 12.dp)
@@ -152,18 +215,47 @@ fun PlayerBottomBar(
             ) {
                 IconButton(onClick = onPlayPause) {
                     Icon(
-                        imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        imageVector = if (isPlaying) {
+                            Icons.Filled.Pause
+                        } else {
+                            Icons.Filled.PlayArrow
+                        },
+                        contentDescription = if (isPlaying) {
+                            "Pause"
+                        } else {
+                            "Play"
+                        },
                         tint = Color.White,
                         modifier = Modifier.size(32.dp)
                     )
                 }
             }
-            IconButton(onClick = { onSeekBy(10_000L) }) {
-                Icon(Icons.Filled.Forward10, contentDescription = "Forward 10 seconds", tint = Color.White)
+
+            IconButton(
+                onClick = {
+                    onSeekBy(10_000L)
+                }
+            ) {
+                Icon(
+                    Icons.Filled.Forward10,
+                    contentDescription = "Forward 10 seconds",
+                    tint = Color.White
+                )
             }
-            IconButton(onClick = onNext, enabled = hasNext) {
-                Icon(Icons.Filled.SkipNext, contentDescription = "Next", tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f))
+
+            IconButton(
+                onClick = onNext,
+                enabled = hasNext
+            ) {
+                Icon(
+                    Icons.Filled.SkipNext,
+                    contentDescription = "Next",
+                    tint = if (hasNext) {
+                        Color.White
+                    } else {
+                        Color.White.copy(alpha = 0.3f)
+                    }
+                )
             }
         }
 
@@ -172,40 +264,82 @@ fun PlayerBottomBar(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextIconChip(text = "${playbackSpeed}x", icon = Icons.Filled.Speed, onClick = onOpenSpeedMenu)
+            TextIconChip(
+                text = "${playbackSpeed}x",
+                icon = Icons.Filled.Speed,
+                onClick = onOpenSpeedMenu
+            )
+
             IconButton(onClick = onToggleLock) {
                 Icon(
-                    imageVector = if (isLocked) Icons.Filled.Lock else Icons.Filled.LockOpen,
+                    imageVector = if (isLocked) {
+                        Icons.Filled.Lock
+                    } else {
+                        Icons.Filled.LockOpen
+                    },
                     contentDescription = "Lock controls",
                     tint = Color.White
                 )
             }
+
             IconButton(onClick = onEnterPip) {
-                Icon(Icons.Filled.PictureInPictureAlt, contentDescription = "Picture in picture", tint = Color.White)
+                Icon(
+                    Icons.Filled.PictureInPictureAlt,
+                    contentDescription = "Picture in picture",
+                    tint = Color.White
+                )
             }
+
             IconButton(onClick = onCycleAspectRatio) {
-                Icon(Icons.Filled.AspectRatio, contentDescription = "Aspect ratio", tint = Color.White)
+                Icon(
+                    Icons.Filled.AspectRatio,
+                    contentDescription = "Aspect ratio",
+                    tint = Color.White
+                )
             }
+
             IconButton(onClick = onToggleRotation) {
-                Icon(Icons.Filled.ScreenRotation, contentDescription = "Rotate", tint = Color.White)
+                Icon(
+                    Icons.Filled.ScreenRotation,
+                    contentDescription = "Rotate",
+                    tint = Color.White
+                )
             }
         }
     }
 }
 
 @Composable
-private fun TextIconChip(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun TextIconChip(
+    text: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    onClick: () -> Unit
+) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(Color.White.copy(alpha = 0.15f))
-            .then(androidx.compose.ui.input.pointer.pointerInput(Unit) { detectTapGestures { onClick() } })
+            .pointerInput(Unit) {
+                detectTapGestures {
+                    onClick()
+                }
+            }
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-        Text(text, color = Color.White, style = MaterialTheme.typography.labelMedium)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = Color.White,
+            modifier = Modifier.size(15.dp)
+        )
+
+        Text(
+            text,
+            color = Color.White,
+            style = MaterialTheme.typography.labelMedium
+        )
     }
 }
 
@@ -217,16 +351,30 @@ private fun Scrubber(
     accentColor: Color,
     onScrub: (Long) -> Unit
 ) {
-    val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
-    val buffered = (bufferedPercentage / 100f).coerceIn(0f, 1f)
+    val progress =
+        if (durationMs > 0) {
+            (currentPositionMs.toFloat() / durationMs.toFloat())
+                .coerceIn(0f, 1f)
+        } else {
+            0f
+        }
 
-    var trackWidthPx by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(1f) }
+    val buffered =
+        (bufferedPercentage / 100f).coerceIn(0f, 1f)
+
+    var trackWidthPx by remember {
+        mutableFloatStateOf(1f)
+    }
 
     Box(
         modifier = Modifier
             .fillMaxWidth()
             .height(24.dp)
-            .pointerInputScrub(durationMs, trackWidthPx, onScrub),
+            .pointerInputScrub(
+                durationMs = durationMs,
+                trackWidthPx = trackWidthPx,
+                onScrub = onScrub
+            ),
         contentAlignment = Alignment.CenterStart
     ) {
         Box(
@@ -235,16 +383,19 @@ private fun Scrubber(
                 .height(4.dp)
                 .clip(RoundedCornerShape(50))
                 .background(Color.White.copy(alpha = 0.25f))
-                .onGloballyPositionedWidth { trackWidthPx = it }
+                .onGloballyPositioned { coordinates ->
+                    trackWidthPx = coordinates.size.width.toFloat()
+                }
         ) {
             Box(
-                Modifier
+                modifier = Modifier
                     .fillMaxWidth(buffered)
                     .height(4.dp)
                     .background(Color.White.copy(alpha = 0.4f))
             )
+
             Box(
-                Modifier
+                modifier = Modifier
                     .fillMaxWidth(progress)
                     .height(4.dp)
                     .background(accentColor)
@@ -253,30 +404,38 @@ private fun Scrubber(
     }
 }
 
-private fun Modifier.onGloballyPositionedWidth(onWidth: (Float) -> Unit): Modifier =
-    this.then(
-        androidx.compose.ui.layout.onGloballyPositioned { coordinates ->
-            onWidth(coordinates.size.width.toFloat())
-        }
-    )
-
-private fun Modifier.pointerInputScrub(durationMs: Long, trackWidthPx: Float, onScrub: (Long) -> Unit): Modifier =
-    this.then(
-        androidx.compose.ui.input.pointer.pointerInput(durationMs, trackWidthPx) {
+private fun Modifier.pointerInputScrub(
+    durationMs: Long,
+    trackWidthPx: Float,
+    onScrub: (Long) -> Unit
+): Modifier {
+    return this
+        .pointerInput(durationMs, trackWidthPx) {
             detectTapGestures { offset ->
                 if (durationMs > 0 && trackWidthPx > 0) {
-                    val fraction = (offset.x / trackWidthPx).coerceIn(0f, 1f)
-                    onScrub((fraction * durationMs).toLong())
+                    val fraction =
+                        (offset.x / trackWidthPx)
+                            .coerceIn(0f, 1f)
+
+                    onScrub(
+                        (fraction * durationMs).toLong()
+                    )
                 }
             }
         }
-    ).then(
-        androidx.compose.ui.input.pointer.pointerInput(durationMs, trackWidthPx) {
+        .pointerInput(durationMs, trackWidthPx) {
             detectDragGestures { change, _ ->
                 if (durationMs > 0 && trackWidthPx > 0) {
-                    val fraction = (change.position.x / trackWidthPx).coerceIn(0f, 1f)
-                    onScrub((fraction * durationMs).toLong())
+                    val fraction =
+                        (change.position.x / trackWidthPx)
+                            .coerceIn(0f, 1f)
+
+                    onScrub(
+                        (fraction * durationMs).toLong()
+                    )
                 }
+
+                change.consume()
             }
         }
-    )
+}
