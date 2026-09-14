@@ -65,11 +65,10 @@ android {
         }
     }
 
-    androidResources {
-        // The app has no translated strings yet; keep only the English resources
-        // instead of shipping every locale's framework resource overlay.
-        localeFilters += listOf("en")
-    }
+    // Note: this app has no translated strings, only en, so there's no locale
+    // filtering config here to prune -- a `localeFilters` block was tried and
+    // removed after CI reported it unresolved against this AGP/DSL version;
+    // not worth chasing since there's nothing to filter yet anyway.
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
