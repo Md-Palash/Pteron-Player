@@ -10,6 +10,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -336,7 +338,7 @@ fun PlayerScreen(
             ) {
                 androidx.compose.material3.IconButton(onClick = { isLocked = false; controlsVisible = true }) {
                     androidx.compose.material3.Icon(
-                        androidx.compose.material.icons.Icons.Outlined.Lock,
+                        Icons.Outlined.Lock,
                         contentDescription = "Unlock controls",
                         tint = Color.White
                     )
