@@ -10,7 +10,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.platform.LocalIndication
+import androidx.compose.foundation.LocalIndication
 
 /**
  * A drop-in replacement for `Modifier.clickable(onClick = ...)` that adds a
