@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Content is deliberately kept within the 66dp adaptive-icon safe zone
+  (x/y 21..87 of the 108x108 canvas) so nothing is clipped by circular,
+  squircle, or rounded-square launcher masks.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Play triangle, rounded corners, centered in the safe zone. -->
+    <path
+        android:fillColor="#F8F3EC"
+        android:pathData="M42,38 C42,35.6 44.6,34.1 46.7,35.3 L74,51 C76.1,52.2 76.1,55.2 74,56.4 L46.7,72.1 C44.6,73.3 42,71.8 42,69.4 Z" />
+    <!-- Small accent dot, matching the reference mark above-left of the triangle. -->
+    <path
+        android:fillColor="#D26938"
+        android:pathData="M32,30 m-4,0 a4,4 0 1,0 8,0 a4,4 0 1,0 -8,0" />
+</vector>
