@@ -2,10 +2,15 @@
 <data-extraction-rules>
     <cloud-backup>
         <exclude domain="sharedpref" path="."/>
-        <exclude domain="datastore" path="."/>
+        <!-- DataStore Preferences files live under the app's internal files
+             directory (files/datastore/...); "datastore" is not a valid
+             domain value and fails lint's FullBackupContent check.
+             Excluding the whole files/datastore/ folder is the correct way
+             to keep playback history/settings out of backups. -->
+        <exclude domain="file" path="datastore/"/>
     </cloud-backup>
     <device-transfer>
         <exclude domain="sharedpref" path="."/>
-        <exclude domain="datastore" path="."/>
+        <exclude domain="file" path="datastore/"/>
     </device-transfer>
 </data-extraction-rules>
