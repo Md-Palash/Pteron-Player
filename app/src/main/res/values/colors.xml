@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="splash_background">#FFF8F2</color>
+    <!-- Only shown for the split second before the app draws its first frame; matches the
+         default theme (Terracotta). MainActivity repaints the window with the last used theme
+         as soon as it starts. -->
+    <color name="splash_background">#FAF1E8</color>
 </resources>
