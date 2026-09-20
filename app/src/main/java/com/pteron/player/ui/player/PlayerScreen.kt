@@ -44,7 +44,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.prefs.OrientationLock
-import com.pteron.player.theme.toComposeColor
+import com.pteron.player.theme.forVideoOverlay
 import com.pteron.player.ui.player.components.BrightnessHud
 import com.pteron.player.ui.player.components.GestureOverlay
 import com.pteron.player.ui.player.components.PlayerBottomBar
@@ -228,6 +228,10 @@ fun PlayerScreen(
     // The AndroidView's update block re-runs whenever a state it reads changes. Reading these
     // derived values (instead of the whole uiState) means it only re-runs when one of these
     // three actually changes, not on every unrelated state update.
+    // The theme's accent, lifted if needed so it stays visible on top of the black video.
+    val themeAccent = MaterialTheme.colorScheme.primary
+    val playerAccent = remember(themeAccent) { themeAccent.forVideoOverlay() }
+
     val aspectMode by remember { derivedStateOf { uiState.aspectRatioMode } }
     val subtitlesEnabled by remember { derivedStateOf { uiState.subtitlesEnabled } }
     val subtitleTextSize by remember { derivedStateOf { uiState.playbackPrefs.subtitleTextSizeSp } }
@@ -380,11 +384,7 @@ fun PlayerScreen(
                     isMuted = uiState.isMuted,
                     repeatMode = uiState.repeatMode,
                     shuffleEnabled = uiState.shuffleEnabled,
-                    accentColor = if (uiState.appearance.matchControlsToAccent) {
-                        uiState.appearance.accentColor.toComposeColor()
-                    } else {
-                        MaterialTheme.colorScheme.secondary
-                    },
+                    accentColor = playerAccent,
                     seekStepMs = viewModel.seekStepMs(),
                     onScrub = { viewModel.seekTo(it) },
                     onPlayPause = viewModel::playPause,
