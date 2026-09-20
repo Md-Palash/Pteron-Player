@@ -2,6 +2,7 @@ package com.pteron.player
 
 import android.app.PictureInPictureParams
 import android.content.Intent
+import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -10,12 +11,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.media3.common.util.UnstableApi
-import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.navigation.PteronNavGraph
 import com.pteron.player.theme.PteronTheme
 import com.pteron.player.util.PipController
@@ -33,17 +34,26 @@ class MainActivity : ComponentActivity() {
 
         val app = application as PteronApp
 
+        // The last used theme is read synchronously, so the window and the very first frame are
+        // already in the right colors (DataStore itself only answers a moment later).
+        val initialTheme = app.appearancePrefsRepository.cachedTheme()
+        window.setBackgroundDrawable(ColorDrawable(initialTheme.backgroundArgb))
+
         // Only on a fresh launch: after a recreation the very same intent is still attached
         // to the activity and would re-open the video the person already closed.
         if (savedInstanceState == null) handleViewIntent(intent)
 
         setContent {
-            val appearance by app.appearancePrefsRepository.state
-                .collectAsState(initial = AppearanceState())
+            // Only the theme is observed here (it emits when the theme itself changes), so
+            // flipping any other appearance setting doesn't touch the app-wide theme at all.
+            val appTheme by app.appearancePrefsRepository.theme.collectAsState(initial = initialTheme)
             val externalVideo by pendingExternalVideo.collectAsState()
 
-            PteronTheme(appearance = appearance) {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            PteronTheme(theme = appTheme) {
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
                     PteronNavGraph(
                         app = app,
                         externalVideoUri = externalVideo,
