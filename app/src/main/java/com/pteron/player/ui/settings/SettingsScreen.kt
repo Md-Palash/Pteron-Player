@@ -1,26 +1,56 @@
 package com.pteron.player.ui.settings
 
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.ContentTransform
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.DeleteSweep
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -31,14 +61,23 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.prefs.AccentColor
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.BackgroundTheme
@@ -46,156 +85,227 @@ import com.pteron.player.data.prefs.FolderTone
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.data.prefs.ThemeMode
+import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.theme.toComposeColor
+import com.pteron.player.ui.common.PteronBottomNavBar
+import com.pteron.player.ui.common.TwoLineTitle
+import com.pteron.player.ui.common.bouncyClickable
+import kotlin.math.roundToInt
+
+/**
+ * The layers of the Settings screen. The first layer shows only these as header cards; opening
+ * one swaps in the settings that belong to it.
+ */
+private enum class SettingsSection(val title: String, val subtitle: String, val icon: ImageVector) {
+    APPEARANCE("Appearance", "Theme, background and accent color", Icons.Outlined.Palette),
+    LIBRARY("Library & folders", "Folder tone and tile badges", Icons.Outlined.FolderOpen),
+    PLAYER("Player controls", "Gestures, seeking and control style", Icons.Outlined.TouchApp),
+    PLAYBACK("Playback", "Resume, auto-play and screen behavior", Icons.Outlined.PlayCircle),
+    AUDIO_SUBTITLES("Audio & subtitles", "Volume boost and subtitle size", Icons.Outlined.GraphicEq),
+    DATA("Data & reset", "Watch history and default settings", Icons.Outlined.Storage)
+}
+
+/** Slide-and-fade between the header list and a section: forward when opening, reversed on back. */
+private fun settingsTransition(opening: Boolean): ContentTransform {
+    val slide = tween<IntOffset>(durationMillis = 320, easing = FastOutSlowInEasing)
+    return if (opening) {
+        (slideInHorizontally(slide) { it / 4 } + fadeIn(tween(260))) togetherWith
+            (slideOutHorizontally(slide) { -it / 6 } + fadeOut(tween(160)))
+    } else {
+        (slideInHorizontally(slide) { -it / 6 } + fadeIn(tween(260))) togetherWith
+            (slideOutHorizontally(slide) { it / 4 } + fadeOut(tween(160)))
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (com.pteron.player.navigation.BottomNavDestination) -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestination) -> Unit) {
     val appearance by viewModel.appearance.collectAsState()
     val playbackPrefs by viewModel.playbackPrefs.collectAsState()
-    var showClearHistoryConfirm by remember { mutableStateOf(false) }
+
+    // Survives rotation and returning from another tab, so the person stays where they were.
+    var openSectionName by rememberSaveable { mutableStateOf<String?>(null) }
+    val openSection = openSectionName?.let { name -> SettingsSection.entries.firstOrNull { it.name == name } }
+
+    BackHandler(enabled = openSection != null) { openSectionName = null }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { com.pteron.player.ui.common.TwoLineTitle(subtitle = "PTERON PLAYER", title = "Settings") },
-                actions = {
-                    TextButton(onClick = viewModel::resetToDefaults) {
-                        Icon(Icons.Outlined.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.size(4.dp))
-                        Text("Reset")
+                navigationIcon = {
+                    AnimatedVisibility(
+                        visible = openSection != null,
+                        enter = fadeIn() + expandHorizontally(),
+                        exit = fadeOut() + shrinkHorizontally()
+                    ) {
+                        IconButton(onClick = { openSectionName = null }) {
+                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to settings")
+                        }
+                    }
+                },
+                title = {
+                    AnimatedContent(
+                        targetState = openSection,
+                        transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                        label = "settingsTitle"
+                    ) { section ->
+                        TwoLineTitle(
+                            subtitle = if (section == null) "PTERON PLAYER" else "SETTINGS",
+                            title = section?.title ?: "Settings"
+                        )
                     }
                 }
             )
         },
         bottomBar = {
-            com.pteron.player.ui.common.PteronBottomNavBar(
-                current = com.pteron.player.navigation.BottomNavDestination.SETTINGS,
-                onSelect = onNavigate
+            PteronBottomNavBar(
+                current = BottomNavDestination.SETTINGS,
+                // Tapping the tab you're already on steps back out to the header list.
+                onSelect = { destination ->
+                    if (destination == BottomNavDestination.SETTINGS) openSectionName = null else onNavigate(destination)
+                }
             )
         }
     ) { padding ->
-        LazyColumn(
+        // Only the layer being shown is composed, so an unopened section costs nothing.
+        AnimatedContent(
+            targetState = openSection,
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            item { SectionTitle("Display & Appearance", tag = "PALETTE") }
-            item { ActiveCombinationCard(appearance) }
-            item {
-                ThemeModeRow(appearance.themeMode, viewModel::setThemeMode)
-            }
-            item {
-                BackgroundThemeGrid(appearance.backgroundTheme, viewModel::setBackgroundTheme)
-            }
-            item {
-                AccentColorRow(appearance.accentColor, viewModel::setAccentColor)
-            }
-
-            item { SectionTitle("Folder & Library Appearance", tag = "CARDS") }
-            item {
-                FolderAppearanceCard(appearance, viewModel)
-            }
-
-            item { SectionTitle("Player & Gesture Controls", tag = "PLAYBACK") }
-            item {
-                PlaybackUiCard(appearance, viewModel)
-            }
-
-            item { SectionTitle("Playback Behavior") }
-            item {
-                PlaybackBehaviorCard(playbackPrefs, viewModel)
-            }
-
-            item { SectionTitle("Gestures & Seeking") }
-            item {
-                SeekDurationCard(playbackPrefs, viewModel)
-            }
-
-            item { SectionTitle("Audio") }
-            item {
-                AudioBoostCard(playbackPrefs, viewModel)
-            }
-
-            item { SectionTitle("Subtitles") }
-            item {
-                SubtitleSizeCard(playbackPrefs, viewModel)
-            }
-
-            item { SectionTitle("Device") }
-            item {
-                DeviceOptionsCard(playbackPrefs, viewModel)
-            }
-
-            item { SectionTitle("Data") }
-            item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Clear watch history", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "Removes all resume positions, watched flags, and favorites. This can't be undone.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
-                            TextButton(onClick = { showClearHistoryConfirm = true }) {
-                                Text("Clear history", color = MaterialTheme.colorScheme.error)
-                            }
-                        }
-                    }
-                }
+            transitionSpec = { settingsTransition(opening = targetState != null) },
+            label = "settingsLayer"
+        ) { section ->
+            if (section == null) {
+                SettingsHome(onOpen = { openSectionName = it.name })
+            } else {
+                SettingsSectionContent(section, appearance, playbackPrefs, viewModel)
             }
         }
     }
+}
 
-    if (showClearHistoryConfirm) {
-        androidx.compose.material3.AlertDialog(
-            onDismissRequest = { showClearHistoryConfirm = false },
-            title = { Text("Clear watch history?") },
-            text = { Text("This removes all resume positions, watched flags, and favorites across your whole library.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.clearWatchHistory()
-                    showClearHistoryConfirm = false
-                }) { Text("Clear", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearHistoryConfirm = false }) { Text("Cancel") }
-            }
-        )
+// --- Layer 1: header cards ------------------------------------------------------------------
+
+@Composable
+private fun SettingsPage(spacing: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(spacing),
+        content = content
+    )
+}
+
+@Composable
+private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
+    SettingsPage(spacing = 12.dp) {
+        SettingsSection.entries.forEach { section ->
+            SectionHeaderCard(section = section, onClick = { onOpen(section) })
+        }
     }
 }
 
 @Composable
-private fun SectionTitle(text: String, tag: String? = null) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+private fun SectionHeaderCard(section: SettingsSection, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(24.dp)
+    Card(
+        // clip() sits outside bouncyClickable so the press ripple follows the rounded corners.
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .semantics { role = Role.Button }
+            .bouncyClickable(onClick = onClick),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             Box(
                 modifier = Modifier
-                    .size(7.dp)
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-            Text(text, style = MaterialTheme.typography.headlineSmall)
-        }
-        if (tag != null) {
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.secondaryContainer),
+                contentAlignment = Alignment.Center
             ) {
+                Icon(
+                    imageVector = section.icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(section.title, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    tag,
-                    style = MaterialTheme.typography.labelSmall,
+                    section.subtitle,
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
+    }
+}
+
+// --- Layer 2: the settings under one header ---------------------------------------------------
+
+@Composable
+private fun SettingsSectionContent(
+    section: SettingsSection,
+    appearance: AppearanceState,
+    playbackPrefs: PlaybackPrefsState,
+    viewModel: SettingsViewModel
+) {
+    SettingsPage {
+        when (section) {
+            SettingsSection.APPEARANCE -> {
+                ActiveCombinationCard(appearance)
+                LabeledGroup("Mode") { ThemeModeRow(appearance.themeMode, viewModel::setThemeMode) }
+                LabeledGroup("Background") { BackgroundThemeGrid(appearance.backgroundTheme, viewModel::setBackgroundTheme) }
+                LabeledGroup("Accent color") { AccentColorRow(appearance.accentColor, viewModel::setAccentColor) }
+            }
+            SettingsSection.LIBRARY -> {
+                FolderAppearanceCard(appearance, viewModel)
+            }
+            SettingsSection.PLAYER -> {
+                PlaybackUiCard(appearance, viewModel)
+                LabeledGroup("Seeking") { SeekDurationCard(playbackPrefs, viewModel) }
+                LabeledGroup("Controls") { ControlAutoHideCard(playbackPrefs, viewModel) }
+            }
+            SettingsSection.PLAYBACK -> {
+                PlaybackBehaviorCard(playbackPrefs, viewModel)
+                LabeledGroup("Screen") { ScreenOptionsCard(playbackPrefs, viewModel) }
+            }
+            SettingsSection.AUDIO_SUBTITLES -> {
+                LabeledGroup("Audio") { AudioBoostCard(playbackPrefs, viewModel) }
+                LabeledGroup("Subtitles") { SubtitleSizeCard(playbackPrefs, viewModel) }
+            }
+            SettingsSection.DATA -> {
+                DataCards(viewModel)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LabeledGroup(label: String, content: @Composable () -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        content()
     }
 }
 
@@ -230,7 +340,7 @@ private fun ActiveCombinationCard(appearance: AppearanceState) {
 private fun ThemeModeRow(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         ThemeMode.entries.forEach { mode ->
-            androidx.compose.material3.FilterChip(
+            FilterChip(
                 selected = selected == mode,
                 onClick = { onSelect(mode) },
                 label = { Text(mode.displayName) }
@@ -249,11 +359,11 @@ private fun BackgroundThemeGrid(selected: BackgroundTheme, onSelect: (Background
                         modifier = Modifier
                             .weight(1f)
                             .clickable { onSelect(theme) },
-                        colors = androidx.compose.material3.CardDefaults.cardColors(
+                        colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
                         ),
                         border = if (selected == theme) {
-                            androidx.compose.foundation.BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
+                            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
                         } else null
                     ) {
                         Column(modifier = Modifier.padding(10.dp)) {
@@ -350,7 +460,7 @@ private fun FolderAppearanceCard(appearance: AppearanceState, viewModel: Setting
                 checked = appearance.showVideoCountBadge,
                 onCheckedChange = viewModel::setShowVideoCountBadge
             )
-            androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             SettingsSwitchRow(
                 title = "Show folder size",
                 subtitle = "Adds total storage used to each folder tile",
@@ -371,33 +481,27 @@ private fun PlaybackUiCard(appearance: AppearanceState, viewModel: SettingsViewM
                 checked = appearance.matchControlsToAccent,
                 onCheckedChange = viewModel::setMatchControlsToAccent
             )
-            androidx.compose.material3.HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             SettingsSwitchRow(
                 title = "OLED pure-black controls tray",
                 subtitle = "Zero-power backdrop for the player's control bar",
                 checked = appearance.oledPureBlackControls,
                 onCheckedChange = viewModel::setOledPureBlackControls
             )
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Gesture scrub sensitivity", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        sensitivityLabel(appearance.gestureSensitivity),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+            SliderSetting(
+                title = "Gesture scrub sensitivity",
+                value = appearance.gestureSensitivity,
+                valueRange = 0.5f..2.0f,
+                steps = 5,
+                onCommit = viewModel::setGestureSensitivity,
+                valueLabel = ::sensitivityLabel,
+                footer = {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("Precise", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text("Fast", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
-                Slider(
-                    value = appearance.gestureSensitivity,
-                    onValueChange = viewModel::setGestureSensitivity,
-                    valueRange = 0.5f..2.0f,
-                    steps = 5
-                )
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Precise", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Text("Fast", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
+            )
         }
     }
 }
@@ -423,8 +527,52 @@ private fun SettingsSwitchRow(title: String, subtitle: String, checked: Boolean,
     }
 }
 
+/**
+ * A slider that only saves when the finger lifts. Dragging used to write to disk on every
+ * pixel of movement (dozens of DataStore writes per second); now the label and thumb follow the
+ * drag locally and a single write happens on release.
+ */
 @Composable
-private fun ColorSwatch(color: Color, size: androidx.compose.ui.unit.Dp, isCircle: Boolean) {
+private fun SliderSetting(
+    title: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    onCommit: (Float) -> Unit,
+    valueLabel: (Float) -> String,
+    steps: Int = 0,
+    description: String? = null,
+    footer: (@Composable () -> Unit)? = null
+) {
+    var dragValue by remember(value) { mutableFloatStateOf(value) }
+    Column {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(title, style = MaterialTheme.typography.titleSmall)
+            Text(
+                valueLabel(dragValue),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        if (description != null) {
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Slider(
+            value = dragValue,
+            onValueChange = { dragValue = it },
+            onValueChangeFinished = { onCommit(dragValue) },
+            valueRange = valueRange,
+            steps = steps
+        )
+        footer?.invoke()
+    }
+}
+
+@Composable
+private fun ColorSwatch(color: Color, size: Dp, isCircle: Boolean) {
     Box(
         modifier = Modifier
             .size(size)
@@ -465,9 +613,8 @@ private fun SeekDurationCard(prefs: PlaybackPrefsState, viewModel: SettingsViewM
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf(5, 10, 15, 30).forEach { seconds ->
-                    val selected = prefs.doubleTapSeekSeconds == seconds
-                    androidx.compose.material3.FilterChip(
-                        selected = selected,
+                    FilterChip(
+                        selected = prefs.doubleTapSeekSeconds == seconds,
                         onClick = { viewModel.setDoubleTapSeekSeconds(seconds) },
                         label = { Text("${seconds}s") }
                     )
@@ -478,64 +625,24 @@ private fun SeekDurationCard(prefs: PlaybackPrefsState, viewModel: SettingsViewM
 }
 
 @Composable
-private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
+private fun ControlAutoHideCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SettingsSwitchRow(
-                title = "Audio boost",
-                subtitle = "Amplifies quiet audio beyond 100% volume, MX Player-style",
-                checked = prefs.audioBoostEnabled,
-                onCheckedChange = viewModel::setAudioBoostEnabled
-            )
-            if (prefs.audioBoostEnabled) {
-                Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("Boost level", style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            "${prefs.audioBoostLevel.toInt()}%",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    Slider(
-                        value = prefs.audioBoostLevel,
-                        onValueChange = viewModel::setAudioBoostLevel,
-                        valueRange = 0f..100f
-                    )
-                    Text(
-                        "Higher boost can distort audio on some devices/videos.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SubtitleSizeCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("Subtitle text size", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${prefs.subtitleTextSizeSp.toInt()}sp",
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-            Slider(
-                value = prefs.subtitleTextSizeSp,
-                onValueChange = viewModel::setSubtitleTextSize,
-                valueRange = 12f..28f
+        Column(modifier = Modifier.padding(16.dp)) {
+            SliderSetting(
+                title = "Control auto-hide",
+                description = "How long player controls stay visible before hiding, while playing",
+                value = prefs.controlAutoHideSeconds.toFloat(),
+                valueRange = 1f..10f,
+                steps = 8,
+                onCommit = { viewModel.setControlAutoHideSeconds(it.roundToInt()) },
+                valueLabel = { "${it.roundToInt()}s" }
             )
         }
     }
 }
 
 @Composable
-private fun DeviceOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
+private fun ScreenOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SettingsSwitchRow(
@@ -549,7 +656,7 @@ private fun DeviceOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsView
                 Spacer(Modifier.size(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OrientationLock.entries.forEach { lock ->
-                        androidx.compose.material3.FilterChip(
+                        FilterChip(
                             selected = prefs.orientationLock == lock,
                             onClick = { viewModel.setOrientationLock(lock) },
                             label = {
@@ -569,8 +676,8 @@ private fun DeviceOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsView
                 Text("Default aspect ratio", style = MaterialTheme.typography.titleSmall)
                 Spacer(Modifier.size(6.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    com.pteron.player.data.model.AspectRatioMode.entries.forEach { mode ->
-                        androidx.compose.material3.FilterChip(
+                    AspectRatioMode.entries.forEach { mode ->
+                        FilterChip(
                             selected = prefs.defaultAspectRatio == mode,
                             onClick = { viewModel.setDefaultAspectRatio(mode) },
                             label = { Text(mode.label) }
@@ -578,26 +685,136 @@ private fun DeviceOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsView
                     }
                 }
             }
-            Column {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Control auto-hide", style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "${prefs.controlAutoHideSeconds}s",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
+        }
+    }
+}
+
+@Composable
+private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            SettingsSwitchRow(
+                title = "Audio boost",
+                subtitle = "Amplifies quiet audio beyond 100% volume, MX Player-style",
+                checked = prefs.audioBoostEnabled,
+                onCheckedChange = viewModel::setAudioBoostEnabled
+            )
+            if (prefs.audioBoostEnabled) {
+                SliderSetting(
+                    title = "Boost level",
+                    value = prefs.audioBoostLevel,
+                    valueRange = 0f..100f,
+                    onCommit = viewModel::setAudioBoostLevel,
+                    valueLabel = { "${it.toInt()}%" },
+                    footer = {
+                        Text(
+                            "Higher boost can distort audio on some devices/videos.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SubtitleSizeCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            SliderSetting(
+                title = "Subtitle text size",
+                value = prefs.subtitleTextSizeSp,
+                valueRange = 12f..28f,
+                onCommit = viewModel::setSubtitleTextSize,
+                valueLabel = { "${it.toInt()}sp" }
+            )
+        }
+    }
+}
+
+// --- Data & reset ----------------------------------------------------------------------------
+
+@Composable
+private fun DataCards(viewModel: SettingsViewModel) {
+    var showClearHistoryConfirm by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        DataActionCard(
+            icon = Icons.Outlined.DeleteSweep,
+            title = "Clear watch history",
+            description = "Removes all resume positions, watched flags, and favorites. This can't be undone.",
+            actionLabel = "Clear history",
+            onAction = { showClearHistoryConfirm = true }
+        )
+        DataActionCard(
+            icon = Icons.Outlined.RestartAlt,
+            title = "Reset appearance",
+            description = "Restores theme, colors, folder style, gesture sensitivity, sorting and view mode to their defaults.",
+            actionLabel = "Reset",
+            onAction = { showResetConfirm = true }
+        )
+    }
+
+    if (showClearHistoryConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearHistoryConfirm = false },
+            title = { Text("Clear watch history?") },
+            text = { Text("This removes all resume positions, watched flags, and favorites across your whole library.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearWatchHistory()
+                    showClearHistoryConfirm = false
+                }) { Text("Clear", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHistoryConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+    if (showResetConfirm) {
+        AlertDialog(
+            onDismissRequest = { showResetConfirm = false },
+            title = { Text("Reset appearance?") },
+            text = { Text("All appearance settings go back to their defaults. Your videos and watch history are not affected.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.resetToDefaults()
+                    showResetConfirm = false
+                }) { Text("Reset", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetConfirm = false }) { Text("Cancel") }
+            }
+        )
+    }
+}
+
+@Composable
+private fun DataActionCard(
+    icon: ImageVector,
+    title: String,
+    description: String,
+    actionLabel: String,
+    onAction: () -> Unit
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                Text(title, style = MaterialTheme.typography.titleSmall)
+            }
+            Text(
+                description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = onAction) {
+                    Text(actionLabel, color = MaterialTheme.colorScheme.error)
                 }
-                Text(
-                    "How long player controls stay visible before hiding, while playing",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Slider(
-                    value = prefs.controlAutoHideSeconds.toFloat(),
-                    onValueChange = { viewModel.setControlAutoHideSeconds(it.toInt()) },
-                    valueRange = 1f..10f,
-                    steps = 8
-                )
             }
         }
     }
