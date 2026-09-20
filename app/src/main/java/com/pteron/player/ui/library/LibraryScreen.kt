@@ -55,7 +55,6 @@ import com.pteron.player.ui.common.videoLibraryPermission
 import com.pteron.player.ui.library.components.ContinueWatchingCard
 import com.pteron.player.ui.library.components.FolderCard
 import com.pteron.player.ui.library.components.FolderListRow
-import com.pteron.player.theme.toComposeColor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,7 +146,6 @@ private fun LibraryContent(
     onOpenFolder: (String, String) -> Unit,
     onOpenVideo: (Long, String) -> Unit
 ) {
-    val folderTone = uiState.appearance.folderTone.toComposeColor()
     val filtered = uiState.filteredFolders
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -202,7 +200,6 @@ private fun LibraryContent(
                 items(filtered, key = { it.bucketId }) { folder ->
                     FolderCard(
                         folder = folder,
-                        folderTone = folderTone,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
                         onClick = { onOpenFolder(folder.bucketId, folder.name) }
@@ -217,7 +214,6 @@ private fun LibraryContent(
                 items(filtered, key = { it.bucketId }) { folder ->
                     FolderListRow(
                         folder = folder,
-                        folderTone = folderTone,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
                         onClick = { onOpenFolder(folder.bucketId, folder.name) }
