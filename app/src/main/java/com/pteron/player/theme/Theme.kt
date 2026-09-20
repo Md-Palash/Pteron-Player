@@ -1,167 +1,153 @@
 package com.pteron.player.theme
 
+import android.app.Activity
+import android.graphics.drawable.ColorDrawable
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
-import com.pteron.player.data.prefs.AccentColor
-import com.pteron.player.data.prefs.AppearanceState
-import com.pteron.player.data.prefs.BackgroundTheme
-import com.pteron.player.data.prefs.FolderTone
-import com.pteron.player.data.prefs.ThemeMode
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalView
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.WindowCompat
+import com.pteron.player.data.prefs.AppTheme
 
-/** Exposes the raw appearance selections (accent hex, folder tone) to leaf composables
- *  that need them directly, e.g. folder cards and the player's scrub bar. */
-val LocalAppearance = staticCompositionLocalOf { AppearanceState() }
+/**
+ * The three shades of a theme, as Compose colors.
+ *  - [background]: screen background (light shade)
+ *  - [card]: cards, top bar, bottom bar (medium shade)
+ *  - [accent]: folder icons, selected options, toggles (dark shade)
+ */
+@Immutable
+data class ThemeColors(
+    val background: Color,
+    val card: Color,
+    val accent: Color,
+    val isDark: Boolean
+)
 
-private fun hex(hex: String) = Color(android.graphics.Color.parseColor(hex))
+private fun parseHex(hex: String) = Color(android.graphics.Color.parseColor(hex))
 
-/** Mixes [color] toward black ([amount] > 0) or white ([amount] < 0), producing a
- *  solid, opaque tone -- used instead of alpha compositing so container colors stay
- *  crisp regardless of what's behind them. */
-private fun shade(color: Color, amount: Float): Color {
-    val target = if (amount >= 0f) Color.Black else Color.White
-    val fraction = amount.coerceIn(-1f, 1f).let { if (it < 0) -it else it }
-    return lerp(color, target, fraction)
-}
+fun AppTheme.colors(): ThemeColors =
+    ThemeColors(parseHex(backgroundHex), parseHex(cardHex), parseHex(accentHex), isDark)
 
-private fun lerp(a: Color, b: Color, t: Float) = Color(
+/** Mixes [a] toward [b] by [t] (0 = a, 1 = b), producing a solid, opaque color. */
+private fun mix(a: Color, b: Color, t: Float) = Color(
     red = a.red + (b.red - a.red) * t,
     green = a.green + (b.green - a.green) * t,
     blue = a.blue + (b.blue - a.blue) * t,
     alpha = 1f
 )
 
-/** White text on dark/saturated containers, near-black on light/pale ones. */
-private fun onColorFor(container: Color): Color =
-    if (container.luminance() > 0.5f) Color(0xFF1E1B16) else Color.White
+private val DarkText = Color(0xFF1A1410)
+
+/** White or near-black, whichever is easier to read on [container]. */
+fun readableOn(container: Color): Color {
+    val l = container.luminance()
+    val contrastWithWhite = 1.05f / (l + 0.05f)
+    val contrastWithDark = (l + 0.05f) / (DarkText.luminance() + 0.05f)
+    return if (contrastWithWhite >= contrastWithDark) Color.White else DarkText
+}
 
 /**
- * Resolves the Light/Dark/System preference against the person's saved
- * palette choice. If System mode disagrees with the saved palette's
- * light/dark family (e.g. the phone just switched to dark mode but "Light
- * Cream" was selected), falls back to a sensible default in the requested
- * family rather than showing the wrong contrast.
+ * The accent as used on top of the always-black video overlay: a deep accent (light themes) would
+ * nearly disappear there, so its lightness is lifted while keeping the same hue and saturation.
  */
-fun resolveEffectiveBackgroundTheme(mode: ThemeMode, selected: BackgroundTheme, systemIsDark: Boolean): BackgroundTheme {
-    val wantDark = when (mode) {
-        ThemeMode.LIGHT -> false
-        ThemeMode.DARK -> true
-        ThemeMode.SYSTEM -> systemIsDark
-    }
-    return if (selected.isDark == wantDark) {
-        selected
-    } else if (wantDark) {
-        BackgroundTheme.WARM_WALNUT
-    } else {
-        BackgroundTheme.WARM_ALMOND
-    }
+fun Color.forVideoOverlay(): Color {
+    if (luminance() >= 0.2f) return this
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(toArgb(), hsl)
+    hsl[2] = hsl[2].coerceAtLeast(0.62f)
+    return Color(ColorUtils.HSLToColor(hsl))
+}
+
+/**
+ * Maps the three shades onto Material's color roles, so every screen that uses
+ * `MaterialTheme.colorScheme` follows the theme without knowing about it:
+ *
+ *  - background                          -> light shade
+ *  - surface + every surfaceContainer    -> medium shade (cards, top/bottom bars, dialogs, menus)
+ *  - primary / secondaryContainer / ...  -> dark shade (folders, selected options, switches)
+ */
+private fun ThemeColors.toColorScheme(): ColorScheme {
+    val onAccent = readableOn(accent)
+    val text = if (isDark) mix(accent, Color.White, 0.88f) else mix(accent, Color.Black, 0.85f)
+    val textSecondary = mix(text, background, 0.35f)
+    val outline = mix(card, accent, 0.55f)
+    val outlineVariant = mix(card, accent, 0.25f)
+    // Slightly deeper than a card: the empty part of sliders and the "off" track of switches.
+    val trackTone = mix(card, accent, 0.20f)
+
+    val base = if (isDark) darkColorScheme() else lightColorScheme()
+    return base.copy(
+        primary = accent,
+        onPrimary = onAccent,
+        primaryContainer = accent,
+        onPrimaryContainer = onAccent,
+        inversePrimary = accent,
+        secondary = accent,
+        onSecondary = onAccent,
+        secondaryContainer = accent,
+        onSecondaryContainer = onAccent,
+        tertiary = accent,
+        onTertiary = onAccent,
+        tertiaryContainer = accent,
+        onTertiaryContainer = onAccent,
+        background = background,
+        onBackground = text,
+        surface = card,
+        onSurface = text,
+        surfaceVariant = card,
+        onSurfaceVariant = textSecondary,
+        surfaceTint = Color.Transparent,
+        inverseSurface = text,
+        inverseOnSurface = background,
+        outline = outline,
+        outlineVariant = outlineVariant,
+        surfaceBright = card,
+        surfaceDim = background,
+        surfaceContainerLowest = card,
+        surfaceContainerLow = card,
+        surfaceContainer = card,
+        surfaceContainerHigh = card,
+        surfaceContainerHighest = trackTone,
+        error = if (isDark) Color(0xFFFFB4AB) else Color(0xFFBA1A1A),
+        onError = if (isDark) Color(0xFF690005) else Color.White,
+        errorContainer = if (isDark) Color(0xFF93000A) else Color(0xFFFFDAD6),
+        onErrorContainer = if (isDark) Color(0xFFFFDAD6) else Color(0xFF93000A)
+    )
 }
 
 @Composable
 fun PteronTheme(
-    appearance: AppearanceState = AppearanceState(),
+    theme: AppTheme = AppTheme.DEFAULT,
     content: @Composable () -> Unit
 ) {
-    val systemIsDark = androidx.compose.foundation.isSystemInDarkTheme()
-    val resolvedTheme = resolveEffectiveBackgroundTheme(appearance.themeMode, appearance.backgroundTheme, systemIsDark)
+    val colors = remember(theme) { theme.colors() }
+    val colorScheme = remember(colors) { colors.toColorScheme() }
 
-    val accent = hex(appearance.accentColor.hex)
-    val isDark = resolvedTheme.isDark
-    val backgroundColor = hex(resolvedTheme.backgroundHex)
-
-    // Solid, opaque container tones derived from the chosen accent -- no alpha
-    // compositing, so these look identical regardless of what's behind them.
-    val primaryContainer = shade(accent, if (isDark) -0.35f else 0.22f)
-    val onPrimaryContainerColor = onColorFor(primaryContainer)
-
-    val colorScheme = if (isDark) {
-        darkColorScheme(
-            primary = accent,
-            onPrimary = onColorFor(accent),
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainerColor,
-            secondary = DarkSecondary,
-            onSecondary = DarkOnSecondary,
-            secondaryContainer = DarkSecondaryContainer,
-            onSecondaryContainer = DarkOnSecondaryContainer,
-            tertiary = DarkTertiary,
-            onTertiary = DarkOnTertiary,
-            tertiaryContainer = DarkTertiaryContainer,
-            onTertiaryContainer = DarkOnTertiaryContainer,
-            background = backgroundColor,
-            onBackground = DarkOnBackground,
-            surface = backgroundColor,
-            onSurface = DarkOnSurface,
-            surfaceTint = accent,
-            surfaceVariant = DarkSurfaceVariant,
-            onSurfaceVariant = DarkOnSurfaceVariant,
-            outline = DarkOutline,
-            outlineVariant = DarkOutlineVariant,
-            surfaceContainerLowest = DarkSurfaceContainerLowest,
-            surfaceContainerLow = DarkSurfaceContainerLow,
-            surfaceContainer = DarkSurfaceContainer,
-            surfaceContainerHigh = DarkSurfaceContainerHigh,
-            surfaceContainerHighest = DarkSurfaceContainerHighest,
-            inverseSurface = DarkInverseSurface,
-            inverseOnSurface = DarkInverseOnSurface,
-            inversePrimary = accent,
-            error = LightError,
-            onError = LightOnError,
-            errorContainer = LightErrorContainer,
-            onErrorContainer = LightOnErrorContainer
-        )
-    } else {
-        lightColorScheme(
-            primary = accent,
-            onPrimary = onColorFor(accent),
-            primaryContainer = primaryContainer,
-            onPrimaryContainer = onPrimaryContainerColor,
-            secondary = LightSecondary,
-            onSecondary = LightOnSecondary,
-            secondaryContainer = LightSecondaryContainer,
-            onSecondaryContainer = LightOnSecondaryContainer,
-            tertiary = LightTertiary,
-            onTertiary = LightOnTertiary,
-            tertiaryContainer = LightTertiaryContainer,
-            onTertiaryContainer = LightOnTertiaryContainer,
-            background = backgroundColor,
-            onBackground = LightOnBackground,
-            surface = backgroundColor,
-            onSurface = LightOnSurface,
-            surfaceTint = accent,
-            surfaceVariant = LightSurfaceVariant,
-            onSurfaceVariant = LightOnSurfaceVariant,
-            outline = LightOutline,
-            outlineVariant = LightOutlineVariant,
-            surfaceContainerLowest = LightSurfaceContainerLowest,
-            surfaceContainerLow = LightSurfaceContainerLow,
-            surfaceContainer = LightSurfaceContainer,
-            surfaceContainerHigh = LightSurfaceContainerHigh,
-            surfaceContainerHighest = LightSurfaceContainerHighest,
-            inverseSurface = LightInverseSurface,
-            inverseOnSurface = LightInverseOnSurface,
-            inversePrimary = accent,
-            error = LightError,
-            onError = LightOnError,
-            errorContainer = LightErrorContainer,
-            onErrorContainer = LightOnErrorContainer
-        )
+    // The theme decides light or dark, not the phone: keep the status/navigation bar icons
+    // readable, and paint the window itself so nothing flashes through during transitions.
+    val view = LocalView.current
+    if (!view.isInEditMode) {
+        LaunchedEffect(theme) {
+            val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
+            window.setBackgroundDrawable(ColorDrawable(colors.background.toArgb()))
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !colors.isDark
+            controller.isAppearanceLightNavigationBars = !colors.isDark
+        }
     }
 
-    CompositionLocalProvider(LocalAppearance provides appearance) {
-        MaterialTheme(
-            colorScheme = colorScheme,
-            typography = PteronTypography,
-            content = content
-        )
-    }
+    MaterialTheme(
+        colorScheme = colorScheme,
+        typography = PteronTypography,
+        content = content
+    )
 }
-
-fun AccentColor.toComposeColor(): Color = hex(this.hex)
-fun FolderTone.toComposeColor(): Color = hex(this.hex)
-fun BackgroundTheme.toComposeColor(): Color = hex(this.backgroundHex)
