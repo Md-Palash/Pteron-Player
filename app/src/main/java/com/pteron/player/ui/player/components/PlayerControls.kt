@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pteron.player.ui.player.RepeatMode
@@ -246,7 +247,8 @@ fun PlayerBottomBar(
                         Icon(
                             imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                             contentDescription = if (playing) "Pause" else "Play",
-                            tint = Color.White,
+                            // Readable on any accent: white on deep accents, dark on bright ones.
+                            tint = if (accentColor.luminance() > 0.4f) Color.Black else Color.White,
                             modifier = Modifier.size(32.dp)
                         )
                     }
