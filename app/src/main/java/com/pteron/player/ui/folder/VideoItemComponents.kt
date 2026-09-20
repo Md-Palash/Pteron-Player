@@ -1,6 +1,7 @@
 package com.pteron.player.ui.folder
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +47,18 @@ import com.pteron.player.util.formatFileSize
 import com.pteron.player.util.formatPercent
 import com.pteron.player.util.formatTimecode
 
+/** Every video is a rounded card in the theme's medium shade. */
+private val VideoCardShape = RoundedCornerShape(20.dp)
+private val VideoThumbShape = RoundedCornerShape(14.dp)
+
+/** Card chrome shared by the list row and the grid tile: rounded, medium shade, soft outline. */
+@Composable
+private fun Modifier.videoCard(onClick: () -> Unit): Modifier = this
+    .clip(VideoCardShape)
+    .bouncyClickable(onClick = onClick)
+    .background(MaterialTheme.colorScheme.surfaceContainer, VideoCardShape)
+    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), VideoCardShape)
+
 @Composable
 fun VideoListRow(
     video: VideoItem,
@@ -58,9 +71,7 @@ fun VideoListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .bouncyClickable(onClick = onClick)
+            .videoCard(onClick)
             .padding(10.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
@@ -68,7 +79,7 @@ fun VideoListRow(
             modifier = Modifier
                 .width(112.dp)
                 .height(80.dp)
-                .clip(RoundedCornerShape(10.dp))
+                .clip(VideoThumbShape)
         ) {
             ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
             Box(
@@ -199,8 +210,8 @@ fun VideoGridTile(
     onClearProgress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.clip(RoundedCornerShape(14.dp)).background(MaterialTheme.colorScheme.surfaceContainer).bouncyClickable(onClick = onClick)) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
+    Column(modifier = modifier.videoCard(onClick).padding(8.dp)) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(VideoThumbShape)) {
             ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
             Box(
                 modifier = Modifier
@@ -267,7 +278,7 @@ fun VideoGridTile(
                 }
             }
         }
-        Column(modifier = Modifier.padding(8.dp)) {
+        Column(modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp)) {
             Text(video.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (video.lastPositionMs > 0L && !video.isWatched) {
                 Text(
