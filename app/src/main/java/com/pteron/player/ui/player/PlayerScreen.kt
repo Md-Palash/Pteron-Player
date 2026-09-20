@@ -1,8 +1,13 @@
 package com.pteron.player.ui.player
 
+import android.Manifest
 import android.app.Activity
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
 import android.view.ViewGroup
+import androidx.activity.ComponentActivity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +23,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -28,6 +34,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.PictureInPictureModeChangedInfo
+import androidx.core.content.ContextCompat
+import androidx.core.util.Consumer
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -47,17 +58,25 @@ import com.pteron.player.util.PipController
 import com.pteron.player.util.formatTimecode
 import kotlinx.coroutines.delay
 
+/** The notification permission is only asked once per app launch, never on every video. */
+private var notificationPermissionAsked = false
+
 @UnstableApi
 @Composable
 fun PlayerScreen(
     videoId: Long,
     bucketId: String,
     viewModel: PlayerViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    /** Set when the video was opened from another app; [videoId]/[bucketId] are ignored then. */
+    externalUri: String? = null,
+    /** Start the folder queue with shuffle on ("Shuffle play"). */
+    shuffle: Boolean = false
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
     val activity = context as? Activity
+    val isInPip = rememberIsInPipMode(activity)
 
     val subtitlePickerLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
@@ -70,6 +89,22 @@ fun PlayerScreen(
                 )
             }
             viewModel.loadExternalSubtitle(uri, displayName)
+        }
+    }
+
+    // Without POST_NOTIFICATIONS (Android 13+) the system simply doesn't show the media
+    // notification, so ask once, the first time a video is opened.
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { /* Nothing to do: if denied, playback works exactly the same, just without the notification. */ }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !notificationPermissionAsked &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionAsked = true
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
     }
 
@@ -103,8 +138,36 @@ fun PlayerScreen(
         }
     }
 
-    LaunchedEffect(videoId, bucketId) {
-        viewModel.openVideo(videoId, bucketId)
+    LaunchedEffect(videoId, bucketId, externalUri, shuffle) {
+        if (externalUri != null) {
+            viewModel.openExternal(Uri.parse(externalUri))
+        } else {
+            viewModel.openVideo(videoId, bucketId, shuffle)
+        }
+    }
+
+    // Minimized / screen off: stop decoding video (audio continues through the media
+    // notification). Closing the Picture-in-Picture window is the one case that should
+    // stop playback: the system reports it as a stop while still in PiP mode.
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        if (activity?.isInPictureInPictureMode == true) viewModel.pause()
+        viewModel.onUiVisibilityChanged(false)
+    }
+    LifecycleEventEffect(Lifecycle.Event.ON_START) {
+        viewModel.onUiVisibilityChanged(true)
+    }
+
+    // The mini window has no room for controls: clear everything that could be on screen.
+    LaunchedEffect(isInPip) {
+        if (isInPip) {
+            controlsVisible = false
+            showSpeedSheet = false
+            showAudioSheet = false
+            showSubtitleSheet = false
+            showBrightnessHud = false
+            showVolumeHud = false
+            scrubPreviewMs = null
+        }
     }
 
     // True fullscreen: hides the status bar and navigation bar while the player is open,
@@ -155,16 +218,19 @@ fun PlayerScreen(
         }
     }
 
+    // The video's real aspect ratio for the PiP window is published by PlayerViewModel
+    // (from ExoPlayer's rotation-aware video size), so only eligibility is tracked here.
     DisposableEffect(uiState.isPlaying) {
         PipController.isEligibleForAutoPip.value = uiState.isPlaying
         onDispose { PipController.isEligibleForAutoPip.value = false }
     }
-    LaunchedEffect(uiState.currentVideo?.width, uiState.currentVideo?.height) {
-        val video = uiState.currentVideo
-        if (video != null && video.width > 0 && video.height > 0) {
-            PipController.videoAspectRatio.value = video.width.toFloat() / video.height.toFloat()
-        }
-    }
+
+    // The AndroidView's update block re-runs whenever a state it reads changes. Reading these
+    // derived values (instead of the whole uiState) means it only re-runs when one of these
+    // three actually changes, not on every unrelated state update.
+    val aspectMode by remember { derivedStateOf { uiState.aspectRatioMode } }
+    val subtitlesEnabled by remember { derivedStateOf { uiState.subtitlesEnabled } }
+    val subtitleTextSize by remember { derivedStateOf { uiState.playbackPrefs.subtitleTextSizeSp } }
 
     Box(
         modifier = Modifier
@@ -183,77 +249,87 @@ fun PlayerScreen(
                 }
             },
             update = { playerView ->
-                playerView.player = viewModel.player
-                playerView.resizeMode = when (uiState.aspectRatioMode) {
+                if (playerView.player !== viewModel.player) playerView.player = viewModel.player
+
+                // The small PiP window always shows the whole picture, whatever mode is selected.
+                val mode = if (isInPip) AspectRatioMode.FIT else aspectMode
+                val resizeMode = when (mode) {
                     AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
                     AspectRatioMode.CROP -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
                     AspectRatioMode.FILL -> AspectRatioFrameLayout.RESIZE_MODE_FILL
                 }
-                playerView.subtitleView?.visibility =
-                    if (uiState.subtitlesEnabled) android.view.View.VISIBLE else android.view.View.GONE
-                playerView.subtitleView?.setFixedTextSize(
-                    android.util.TypedValue.COMPLEX_UNIT_SP,
-                    uiState.playbackPrefs.subtitleTextSizeSp
-                )
+                if (playerView.resizeMode != resizeMode) playerView.resizeMode = resizeMode
+
+                playerView.subtitleView?.let { subtitleView ->
+                    val visibility = if (subtitlesEnabled) android.view.View.VISIBLE else android.view.View.GONE
+                    if (subtitleView.visibility != visibility) subtitleView.visibility = visibility
+                    subtitleView.setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, subtitleTextSize)
+                }
             },
             modifier = Modifier.fillMaxSize()
         )
 
-        GestureOverlay(
-            modifier = Modifier.fillMaxSize(),
-            locked = isLocked,
-            sensitivity = uiState.appearance.gestureSensitivity,
-            durationMs = uiState.durationMs,
-            currentPositionMs = uiState.currentPositionMs,
-            onToggleControls = { controlsVisible = !controlsVisible },
-            onSeekBy = viewModel::seekBy,
-            seekStepMs = viewModel.seekStepMs(),
-            onScrubPreview = { scrubPreviewMs = it },
-            onScrubCommit = { viewModel.seekTo(it) },
-            onFlash = { flashSide = it },
-            onBrightnessChanged = {
-                brightnessLevel = it
-                showBrightnessHud = true
-            },
-            onVolumeChanged = { fraction, current, max ->
-                volumeFraction = fraction
-                volumeCurrent = current
-                volumeMax = max
-                showVolumeHud = true
-            }
-        )
-
-        BrightnessHud(
-            level = brightnessLevel,
-            visible = showBrightnessHud,
-            modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)
-        )
-        VolumeHud(
-            fraction = volumeFraction,
-            current = volumeCurrent,
-            max = volumeMax,
-            visible = showVolumeHud,
-            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 24.dp)
-        )
-
-        SeekFlashIndicator(
-            side = flashSide,
-            seekSeconds = uiState.playbackPrefs.doubleTapSeekSeconds,
-            modifier = Modifier.align(Alignment.Center)
-        )
-
-        scrubPreviewMs?.let { previewMs ->
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            ) {
-                Text(
-                    text = formatTimecode(previewMs),
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        if (!isInPip) {
+            // The position changes every second; reading it inside WithProgress keeps that
+            // recomposition local to these two layers instead of the whole player screen.
+            WithProgress(viewModel) { progress ->
+                GestureOverlay(
+                    modifier = Modifier.fillMaxSize(),
+                    locked = isLocked,
+                    sensitivity = uiState.appearance.gestureSensitivity,
+                    durationMs = uiState.durationMs,
+                    currentPositionMs = progress.positionMs,
+                    onToggleControls = { controlsVisible = !controlsVisible },
+                    onSeekBy = viewModel::seekBy,
+                    seekStepMs = viewModel.seekStepMs(),
+                    onScrubPreview = { scrubPreviewMs = it },
+                    onScrubCommit = { viewModel.seekTo(it) },
+                    onFlash = { flashSide = it },
+                    onBrightnessChanged = {
+                        brightnessLevel = it
+                        showBrightnessHud = true
+                    },
+                    onVolumeChanged = { fraction, current, max ->
+                        volumeFraction = fraction
+                        volumeCurrent = current
+                        volumeMax = max
+                        showVolumeHud = true
+                    }
                 )
+            }
+
+            BrightnessHud(
+                level = brightnessLevel,
+                visible = showBrightnessHud,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 24.dp)
+            )
+            VolumeHud(
+                fraction = volumeFraction,
+                current = volumeCurrent,
+                max = volumeMax,
+                visible = showVolumeHud,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 24.dp)
+            )
+
+            SeekFlashIndicator(
+                side = flashSide,
+                seekSeconds = uiState.playbackPrefs.doubleTapSeekSeconds,
+                modifier = Modifier.align(Alignment.Center)
+            )
+
+            scrubPreviewMs?.let { previewMs ->
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                ) {
+                    Text(
+                        text = formatTimecode(previewMs),
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    )
+                }
             }
         }
 
@@ -265,7 +341,7 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = controlsVisible && !isLocked,
+            visible = controlsVisible && !isLocked && !isInPip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.TopCenter)
@@ -286,50 +362,52 @@ fun PlayerScreen(
         }
 
         AnimatedVisibility(
-            visible = controlsVisible && !isLocked,
+            visible = controlsVisible && !isLocked && !isInPip,
             enter = fadeIn(),
             exit = fadeOut(),
             modifier = Modifier.align(Alignment.BottomCenter)
         ) {
-            PlayerBottomBar(
-                isPlaying = uiState.isPlaying,
-                currentPositionMs = scrubPreviewMs ?: uiState.currentPositionMs,
-                durationMs = uiState.durationMs,
-                bufferedPercentage = uiState.bufferedPercentage,
-                playbackSpeed = uiState.playbackSpeed,
-                isLocked = isLocked,
-                hasNext = uiState.hasNext,
-                hasPrevious = uiState.hasPrevious,
-                isMuted = uiState.isMuted,
-                repeatMode = uiState.repeatMode,
-                shuffleEnabled = uiState.shuffleEnabled,
-                accentColor = if (uiState.appearance.matchControlsToAccent) {
-                    uiState.appearance.accentColor.toComposeColor()
-                } else {
-                    MaterialTheme.colorScheme.secondary
-                },
-                seekStepMs = viewModel.seekStepMs(),
-                onScrub = { viewModel.seekTo(it) },
-                onPlayPause = viewModel::playPause,
-                onSeekBy = viewModel::seekBy,
-                onNext = viewModel::skipToNext,
-                onPrevious = viewModel::skipToPrevious,
-                onOpenSpeedMenu = { showSpeedSheet = true },
-                onToggleLock = { isLocked = !isLocked; controlsVisible = true },
-                onEnterPip = {
-                    activity?.let { enterPictureInPicture(it) }
-                },
-                onToggleRotation = {
-                    activity?.let { toggleOrientation(it) }
-                },
-                onCycleAspectRatio = viewModel::cycleAspectRatio,
-                onToggleMute = viewModel::toggleMute,
-                onCycleRepeat = viewModel::cycleRepeatMode,
-                onToggleShuffle = viewModel::toggleShuffle
-            )
+            WithProgress(viewModel) { progress ->
+                PlayerBottomBar(
+                    isPlaying = uiState.isPlaying,
+                    currentPositionMs = scrubPreviewMs ?: progress.positionMs,
+                    durationMs = uiState.durationMs,
+                    bufferedPercentage = progress.bufferedPercentage,
+                    playbackSpeed = uiState.playbackSpeed,
+                    isLocked = isLocked,
+                    hasNext = uiState.hasNext,
+                    hasPrevious = uiState.hasPrevious,
+                    isMuted = uiState.isMuted,
+                    repeatMode = uiState.repeatMode,
+                    shuffleEnabled = uiState.shuffleEnabled,
+                    accentColor = if (uiState.appearance.matchControlsToAccent) {
+                        uiState.appearance.accentColor.toComposeColor()
+                    } else {
+                        MaterialTheme.colorScheme.secondary
+                    },
+                    seekStepMs = viewModel.seekStepMs(),
+                    onScrub = { viewModel.seekTo(it) },
+                    onPlayPause = viewModel::playPause,
+                    onSeekBy = viewModel::seekBy,
+                    onNext = viewModel::skipToNext,
+                    onPrevious = viewModel::skipToPrevious,
+                    onOpenSpeedMenu = { showSpeedSheet = true },
+                    onToggleLock = { isLocked = !isLocked; controlsVisible = true },
+                    onEnterPip = {
+                        activity?.let { enterPictureInPicture(it) }
+                    },
+                    onToggleRotation = {
+                        activity?.let { toggleOrientation(it) }
+                    },
+                    onCycleAspectRatio = viewModel::cycleAspectRatio,
+                    onToggleMute = viewModel::toggleMute,
+                    onCycleRepeat = viewModel::cycleRepeatMode,
+                    onToggleShuffle = viewModel::toggleShuffle
+                )
+            }
         }
 
-        if (isLocked) {
+        if (isLocked && !isInPip) {
             AnimatedVisibility(
                 visible = controlsVisible,
                 enter = fadeIn(),
@@ -396,6 +474,31 @@ fun PlayerScreen(
             }
         )
     }
+}
+
+/**
+ * Collects the fast-changing playback position here, in its own recompose scope, so a
+ * once-per-second tick only redraws [content] and not the entire player screen.
+ */
+@Composable
+private fun WithProgress(viewModel: PlayerViewModel, content: @Composable (PlayerProgress) -> Unit) {
+    val progress by viewModel.progress.collectAsState()
+    content(progress)
+}
+
+/** True while the activity is shown in the system's Picture-in-Picture window. */
+@Composable
+private fun rememberIsInPipMode(activity: Activity?): Boolean {
+    var inPip by remember { mutableStateOf(activity?.isInPictureInPictureMode == true) }
+    DisposableEffect(activity) {
+        val componentActivity = activity as? ComponentActivity
+        val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
+            inPip = info.isInPictureInPictureMode
+        }
+        componentActivity?.addOnPictureInPictureModeChangedListener(listener)
+        onDispose { componentActivity?.removeOnPictureInPictureModeChangedListener(listener) }
+    }
+    return inPip
 }
 
 private fun toggleOrientation(activity: Activity) {
