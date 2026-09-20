@@ -15,7 +15,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
-        vectorDrawables.useSupportLibrary = true
+        // The app only ships English strings, so keep the translations bundled inside
+        // libraries (media3, material, ...) out of the APK. `resourceConfigurations` is the
+        // option that exists on this AGP version (`androidResources.localeFilters` needs 8.8+).
+        resourceConfigurations += "en"
     }
 
     signingConfigs {
@@ -65,17 +68,19 @@ android {
         }
     }
 
-    // Note: this app has no translated strings, only en, so there's no locale
-    // filtering config here to prune -- a `localeFilters` block was tried and
-    // removed after CI reported it unresolved against this AGP/DSL version;
-    // not worth chasing since there's nothing to filter yet anyway.
-
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
         jvmTarget = "17"
+        // Drops the null-check intrinsics Kotlin inserts into every function/call site.
+        // Slightly smaller and faster code; they only guard against Java callers passing null.
+        freeCompilerArgs += listOf(
+            "-Xno-param-assertions",
+            "-Xno-call-assertions",
+            "-Xno-receiver-assertions"
+        )
     }
 
     buildFeatures {
@@ -85,6 +90,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // Debug/tooling metadata that is never read at runtime.
+            excludes += "/DebugProbesKt.bin"
+            excludes += "/kotlin-tooling-metadata.json"
         }
     }
 }
