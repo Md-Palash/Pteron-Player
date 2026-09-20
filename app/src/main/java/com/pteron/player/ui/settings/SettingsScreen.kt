@@ -14,26 +14,28 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -69,7 +71,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -78,15 +82,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.AspectRatioMode
-import com.pteron.player.data.prefs.AccentColor
+import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearanceState
-import com.pteron.player.data.prefs.BackgroundTheme
-import com.pteron.player.data.prefs.FolderTone
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsState
-import com.pteron.player.data.prefs.ThemeMode
 import com.pteron.player.navigation.BottomNavDestination
-import com.pteron.player.theme.toComposeColor
+import com.pteron.player.theme.colors
+import com.pteron.player.theme.readableOn
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
@@ -97,13 +99,16 @@ import kotlin.math.roundToInt
  * one swaps in the settings that belong to it.
  */
 private enum class SettingsSection(val title: String, val subtitle: String, val icon: ImageVector) {
-    APPEARANCE("Appearance", "Theme, background and accent color", Icons.Outlined.Palette),
-    LIBRARY("Library & folders", "Folder tone and tile badges", Icons.Outlined.FolderOpen),
+    APPEARANCE("Theme", "Pick a ready-made color theme", Icons.Outlined.Palette),
+    LIBRARY("Library & folders", "Folder tile badges", Icons.Outlined.FolderOpen),
     PLAYER("Player controls", "Gestures, seeking and control style", Icons.Outlined.TouchApp),
     PLAYBACK("Playback", "Resume, auto-play and screen behavior", Icons.Outlined.PlayCircle),
     AUDIO_SUBTITLES("Audio & subtitles", "Volume boost and subtitle size", Icons.Outlined.GraphicEq),
     DATA("Data & reset", "Watch history and default settings", Icons.Outlined.Storage)
 }
+
+private val lightThemes = AppTheme.entries.filter { !it.isDark }
+private val darkThemes = AppTheme.entries.filter { it.isDark }
 
 /** Slide-and-fade between the header list and a section: forward when opening, reversed on back. */
 private fun settingsTransition(opening: Boolean): ContentTransform {
@@ -206,6 +211,19 @@ private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
     }
 }
 
+/** A card in the theme's medium shade; every card in Settings goes through here. */
+@Composable
+private fun SettingsCard(
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        content = content
+    )
+}
+
 @Composable
 private fun SectionHeaderCard(section: SettingsSection, onClick: () -> Unit) {
     val shape = RoundedCornerShape(24.dp)
@@ -217,7 +235,7 @@ private fun SectionHeaderCard(section: SettingsSection, onClick: () -> Unit) {
             .semantics { role = Role.Button }
             .bouncyClickable(onClick = onClick),
         shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
     ) {
         Row(
@@ -268,16 +286,14 @@ private fun SettingsSectionContent(
     SettingsPage {
         when (section) {
             SettingsSection.APPEARANCE -> {
-                ActiveCombinationCard(appearance)
-                LabeledGroup("Mode") { ThemeModeRow(appearance.themeMode, viewModel::setThemeMode) }
-                LabeledGroup("Background") { BackgroundThemeGrid(appearance.backgroundTheme, viewModel::setBackgroundTheme) }
-                LabeledGroup("Accent color") { AccentColorRow(appearance.accentColor, viewModel::setAccentColor) }
+                LabeledGroup("Light themes") { ThemeGrid(lightThemes, appearance.theme, viewModel::setTheme) }
+                LabeledGroup("Dark themes") { ThemeGrid(darkThemes, appearance.theme, viewModel::setTheme) }
             }
             SettingsSection.LIBRARY -> {
                 FolderAppearanceCard(appearance, viewModel)
             }
             SettingsSection.PLAYER -> {
-                PlaybackUiCard(appearance, viewModel)
+                GestureSensitivityCard(appearance, viewModel)
                 LabeledGroup("Seeking") { SeekDurationCard(playbackPrefs, viewModel) }
                 LabeledGroup("Controls") { ControlAutoHideCard(playbackPrefs, viewModel) }
             }
@@ -309,151 +325,107 @@ private fun LabeledGroup(label: String, content: @Composable () -> Unit) {
     }
 }
 
-/** A quick "here's what you've picked" preview strip, shown above the theme grid. */
+// --- Theme picker -----------------------------------------------------------------------------
+
 @Composable
-private fun ActiveCombinationCard(appearance: AppearanceState) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.padding(14.dp).fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+private fun ThemeGrid(themes: List<AppTheme>, selected: AppTheme, onSelect: (AppTheme) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        themes.chunked(2).forEach { pair ->
+            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                pair.forEach { theme ->
+                    ThemePreviewCard(
+                        theme = theme,
+                        selected = theme == selected,
+                        onClick = { onSelect(theme) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                if (pair.size == 1) Spacer(Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * A tiny mock of the app painted in the theme's own three shades, so the choice is visible before
+ * tapping: background, top and bottom bars and a card in the medium shade, folders and a switch in
+ * the dark (accent) shade.
+ */
+@Composable
+private fun ThemePreviewCard(
+    theme: AppTheme,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = remember(theme) { theme.colors() }
+    val shape = RoundedCornerShape(20.dp)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(1.4f)
+                .border(
+                    width = if (selected) 2.5.dp else 1.dp,
+                    color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                    shape = shape
+                )
+                .clip(shape)
+                .selectable(selected = selected, onClick = onClick, role = Role.RadioButton)
         ) {
-            ColorSwatch(appearance.accentColor.toComposeColor(), size = 32.dp, isCircle = true)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    "ACTIVE COMBINATION",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val w = size.width
+                val h = size.height
+                drawRect(colors.background)
+                // Top and bottom bars.
+                drawRect(colors.card, size = Size(w, h * 0.16f))
+                drawRect(colors.card, topLeft = Offset(0f, h * 0.84f), size = Size(w, h * 0.16f))
+                // Two folders.
+                val folderSize = Size(w * 0.36f, h * 0.30f)
+                val folderCorner = CornerRadius(h * 0.06f)
+                drawRoundRect(colors.accent, Offset(w * 0.10f, h * 0.25f), folderSize, folderCorner)
+                drawRoundRect(colors.accent, Offset(w * 0.54f, h * 0.25f), folderSize, folderCorner)
+                // A card with a switch.
+                drawRoundRect(
+                    colors.card, Offset(w * 0.10f, h * 0.61f), Size(w * 0.80f, h * 0.15f), CornerRadius(h * 0.05f)
                 )
-                Text(
-                    "${appearance.backgroundTheme.displayName} • ${appearance.accentColor.displayName}",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.primary
+                drawRoundRect(
+                    colors.accent, Offset(w * 0.72f, h * 0.655f), Size(w * 0.14f, h * 0.065f), CornerRadius(h * 0.033f)
                 )
             }
-            Icon(Icons.Filled.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        }
-    }
-}
-
-@Composable
-private fun ThemeModeRow(selected: ThemeMode, onSelect: (ThemeMode) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        ThemeMode.entries.forEach { mode ->
-            FilterChip(
-                selected = selected == mode,
-                onClick = { onSelect(mode) },
-                label = { Text(mode.displayName) }
-            )
-        }
-    }
-}
-
-@Composable
-private fun BackgroundThemeGrid(selected: BackgroundTheme, onSelect: (BackgroundTheme) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        BackgroundTheme.entries.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                row.forEach { theme ->
-                    Card(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clickable { onSelect(theme) },
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                        ),
-                        border = if (selected == theme) {
-                            BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary)
-                        } else null
-                    ) {
-                        Column(modifier = Modifier.padding(10.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                ColorSwatch(theme.toComposeColor(), size = 22.dp, isCircle = true)
-                                if (selected == theme) {
-                                    Icon(
-                                        Icons.Filled.Check,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(14.dp)
-                                    )
-                                }
-                            }
-                            Spacer(Modifier.size(6.dp))
-                            Text(theme.displayName, style = MaterialTheme.typography.labelLarge, maxLines = 1)
-                        }
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AccentColorRow(selected: AccentColor, onSelect: (AccentColor) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                AccentColor.entries.forEach { accent ->
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(CircleShape)
-                            .background(if (selected == accent) MaterialTheme.colorScheme.surfaceContainerHighest else Color.Transparent)
-                            .clickable { onSelect(accent) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(accent.toComposeColor()),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            if (selected == accent) {
-                                Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            }
-                        }
-                    }
+            if (selected) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 8.dp, end = 8.dp)
+                        .size(22.dp)
+                        .clip(CircleShape)
+                        .background(colors.accent),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        Icons.Filled.Check,
+                        contentDescription = null,
+                        tint = readableOn(colors.accent),
+                        modifier = Modifier.size(14.dp)
+                    )
                 }
             }
-            Spacer(Modifier.size(8.dp))
-            Text(
-                "Selected: ${selected.displayName}",
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.primary
-            )
         }
+        Text(
+            theme.displayName,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(start = 4.dp)
+        )
     }
 }
+
+// --- Library, player, playback, audio ---------------------------------------------------------
 
 @Composable
 private fun FolderAppearanceCard(appearance: AppearanceState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Folder wood tone", style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                FolderTone.entries.forEach { tone ->
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(tone.toComposeColor())
-                            .clickable { viewModel.setFolderTone(tone) },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        if (appearance.folderTone == tone) {
-                            Icon(Icons.Filled.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-            }
             SettingsSwitchRow(
                 title = "Show video count badge",
                 subtitle = "Displays the number of videos on each folder tile",
@@ -472,22 +444,9 @@ private fun FolderAppearanceCard(appearance: AppearanceState, viewModel: Setting
 }
 
 @Composable
-private fun PlaybackUiCard(appearance: AppearanceState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            SettingsSwitchRow(
-                title = "Match player controls to accent",
-                subtitle = "Uses your accent color on the scrub bar and play button",
-                checked = appearance.matchControlsToAccent,
-                onCheckedChange = viewModel::setMatchControlsToAccent
-            )
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            SettingsSwitchRow(
-                title = "OLED pure-black controls tray",
-                subtitle = "Zero-power backdrop for the player's control bar",
-                checked = appearance.oledPureBlackControls,
-                onCheckedChange = viewModel::setOledPureBlackControls
-            )
+private fun GestureSensitivityCard(appearance: AppearanceState, viewModel: SettingsViewModel) {
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp)) {
             SliderSetting(
                 title = "Gesture scrub sensitivity",
                 value = appearance.gestureSensitivity,
@@ -572,18 +531,8 @@ private fun SliderSetting(
 }
 
 @Composable
-private fun ColorSwatch(color: Color, size: Dp, isCircle: Boolean) {
-    Box(
-        modifier = Modifier
-            .size(size)
-            .clip(if (isCircle) CircleShape else RoundedCornerShape(6.dp))
-            .background(color)
-    )
-}
-
-@Composable
 private fun PlaybackBehaviorCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SettingsSwitchRow(
                 title = "Resume playback",
@@ -603,7 +552,7 @@ private fun PlaybackBehaviorCard(prefs: PlaybackPrefsState, viewModel: SettingsV
 
 @Composable
 private fun SeekDurationCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Double-tap / seek button duration", style = MaterialTheme.typography.titleSmall)
             Text(
@@ -626,7 +575,7 @@ private fun SeekDurationCard(prefs: PlaybackPrefsState, viewModel: SettingsViewM
 
 @Composable
 private fun ControlAutoHideCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             SliderSetting(
                 title = "Control auto-hide",
@@ -643,7 +592,7 @@ private fun ControlAutoHideCard(prefs: PlaybackPrefsState, viewModel: SettingsVi
 
 @Composable
 private fun ScreenOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             SettingsSwitchRow(
                 title = "Keep screen on while playing",
@@ -691,7 +640,7 @@ private fun ScreenOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsView
 
 @Composable
 private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsSwitchRow(
                 title = "Audio boost",
@@ -721,7 +670,7 @@ private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewMod
 
 @Composable
 private fun SubtitleSizeCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp)) {
             SliderSetting(
                 title = "Subtitle text size",
@@ -752,7 +701,7 @@ private fun DataCards(viewModel: SettingsViewModel) {
         DataActionCard(
             icon = Icons.Outlined.RestartAlt,
             title = "Reset appearance",
-            description = "Restores theme, colors, folder style, gesture sensitivity, sorting and view mode to their defaults.",
+            description = "Restores the theme, folder badges, gesture sensitivity, sorting and view mode to their defaults.",
             actionLabel = "Reset",
             onAction = { showResetConfirm = true }
         )
@@ -800,7 +749,7 @@ private fun DataActionCard(
     actionLabel: String,
     onAction: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))

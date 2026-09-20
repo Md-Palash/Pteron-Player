@@ -4,16 +4,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.pteron.player.data.model.AspectRatioMode
-import com.pteron.player.data.prefs.AccentColor
+import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.AppearanceState
-import com.pteron.player.data.prefs.BackgroundTheme
-import com.pteron.player.data.prefs.FolderTone
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.data.prefs.PlaybackStateRepository
-import com.pteron.player.data.prefs.ThemeMode
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -26,7 +23,7 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     val appearance: StateFlow<AppearanceState> = appearanceRepository.state.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), AppearanceState()
+        viewModelScope, SharingStarted.WhileSubscribed(5000), AppearanceState(theme = appearanceRepository.cachedTheme())
     )
     val playbackPrefs: StateFlow<PlaybackPrefsState> = playbackPrefsRepository.state.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), PlaybackPrefsState()
@@ -34,14 +31,9 @@ class SettingsViewModel(
 
     // --- Appearance -------------------------------------------------------------
 
-    fun setBackgroundTheme(theme: BackgroundTheme) = viewModelScope.launch { appearanceRepository.setBackgroundTheme(theme) }
-    fun setThemeMode(mode: ThemeMode) = viewModelScope.launch { appearanceRepository.setThemeMode(mode) }
-    fun setAccentColor(color: AccentColor) = viewModelScope.launch { appearanceRepository.setAccentColor(color) }
-    fun setFolderTone(tone: FolderTone) = viewModelScope.launch { appearanceRepository.setFolderTone(tone) }
+    fun setTheme(theme: AppTheme) = viewModelScope.launch { appearanceRepository.setTheme(theme) }
     fun setShowVideoCountBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowVideoCountBadge(value) }
     fun setShowFolderSizeBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowFolderSizeBadge(value) }
-    fun setMatchControlsToAccent(value: Boolean) = viewModelScope.launch { appearanceRepository.setMatchControlsToAccent(value) }
-    fun setOledPureBlackControls(value: Boolean) = viewModelScope.launch { appearanceRepository.setOledPureBlackControls(value) }
     fun setGestureSensitivity(value: Float) = viewModelScope.launch { appearanceRepository.setGestureSensitivity(value) }
     fun resetToDefaults() = viewModelScope.launch { appearanceRepository.resetToDefaults() }
 
