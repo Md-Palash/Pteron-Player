@@ -27,7 +27,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,20 +36,20 @@ import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.util.formatFileSize
 
 /**
- * Folder tile styled after the Stitch "tactile 2D folder" design: a solid
- * wood-tone card with a small tab peeking out from behind the top edge, like
- * a real manila folder. The tab and body share [folderTone] exactly, so the
- * illusion holds regardless of which tone the user picks in Settings.
+ * Folder tile styled after the Stitch "tactile 2D folder" design: a solid card with a small
+ * tab peeking out from behind the top edge, like a real manila folder. Folders use the theme's
+ * dark (accent) shade; the tab and body share it exactly, so the illusion holds in every theme.
  */
 @Composable
 fun FolderCard(
     folder: VideoFolder,
-    folderTone: Color,
     showVideoCount: Boolean,
     showFolderSize: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val folderColor = MaterialTheme.colorScheme.primary
+    val onFolder = MaterialTheme.colorScheme.onPrimary
     Box(modifier = modifier.aspectRatio(1.5f)) {
         // Folder tab, peeking out above the card's top-left corner.
         Box(
@@ -60,7 +59,7 @@ fun FolderCard(
                 .width(44.dp)
                 .height(12.dp)
                 .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                .background(folderTone)
+                .background(folderColor)
         )
 
         Column(
@@ -68,7 +67,7 @@ fun FolderCard(
                 .fillMaxWidth()
                 .aspectRatio(1.5f)
                 .clip(RoundedCornerShape(18.dp))
-                .background(folderTone)
+                .background(folderColor)
                 .bouncyClickable(onClick = onClick)
                 .padding(14.dp),
             verticalArrangement = Arrangement.SpaceBetween
@@ -82,13 +81,13 @@ fun FolderCard(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.primaryContainer),
+                        .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = folderIconFor(folder.name),
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                        tint = folderColor,
                         modifier = Modifier.size(19.dp)
                     )
                 }
@@ -96,13 +95,13 @@ fun FolderCard(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(50))
-                            .background(Color.Black.copy(alpha = 0.22f))
+                            .background(onFolder.copy(alpha = 0.18f))
                             .padding(horizontal = 8.dp, vertical = 3.dp)
                     ) {
                         Text(
                             text = "${folder.videoCount} items",
                             style = MaterialTheme.typography.labelSmall,
-                            color = Color.White
+                            color = onFolder
                         )
                     }
                 }
@@ -112,7 +111,7 @@ fun FolderCard(
                 Text(
                     text = folder.name,
                     style = MaterialTheme.typography.titleSmall,
-                    color = Color.White,
+                    color = onFolder,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -123,7 +122,7 @@ fun FolderCard(
                 Text(
                     text = subtitle,
                     style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.82f),
+                    color = onFolder.copy(alpha = 0.82f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -135,7 +134,6 @@ fun FolderCard(
 @Composable
 fun FolderListRow(
     folder: VideoFolder,
-    folderTone: Color,
     showVideoCount: Boolean,
     showFolderSize: Boolean,
     onClick: () -> Unit,
@@ -155,13 +153,13 @@ fun FolderListRow(
             modifier = Modifier
                 .size(48.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(folderTone),
+                .background(MaterialTheme.colorScheme.primary),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = folderIconFor(folder.name),
                 contentDescription = null,
-                tint = Color.White
+                tint = MaterialTheme.colorScheme.onPrimary
             )
         }
         Column(modifier = Modifier.weight(1f)) {

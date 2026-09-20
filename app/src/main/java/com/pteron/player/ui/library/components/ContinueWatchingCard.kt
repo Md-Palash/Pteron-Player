@@ -50,7 +50,7 @@ fun ContinueWatchingCard(video: VideoItem, onClick: () -> Unit, modifier: Modifi
                         .background(MaterialTheme.colorScheme.primary)
                         .padding(8.dp)
                 ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Resume", tint = Color.White)
+                    Icon(Icons.Filled.PlayArrow, contentDescription = "Resume", tint = MaterialTheme.colorScheme.onPrimary)
                 }
             }
             Box(
