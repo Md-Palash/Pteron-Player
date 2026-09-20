@@ -1,11 +1,13 @@
 package com.pteron.player.navigation
 
+import android.net.Uri
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -52,8 +54,41 @@ private val popExit = slideOutHorizontally(animationSpec = tween(280)) { it / 4 
 
 @UnstableApi
 @Composable
-fun PteronNavGraph(app: PteronApp) {
+private fun rememberPlayerViewModel(app: PteronApp): PlayerViewModel = viewModel(
+    factory = PlayerViewModel.Factory(
+        app, app.mediaStoreRepository, app.playbackStateRepository, app.appearancePrefsRepository, app.playbackPrefsRepository
+    )
+)
+
+/**
+ * @param externalVideoUri a video another app asked us to open (ACTION_VIEW). When non-null it is
+ *  opened in the player on top of the normal back stack, then [onExternalVideoHandled] is called so
+ *  the same request is never opened twice.
+ */
+@UnstableApi
+@Composable
+fun PteronNavGraph(
+    app: PteronApp,
+    externalVideoUri: Uri? = null,
+    onExternalVideoHandled: () -> Unit = {}
+) {
     val navController = rememberNavController()
+
+    LaunchedEffect(externalVideoUri) {
+        if (externalVideoUri != null) {
+            val current = navController.currentDestination?.route
+            navController.navigate(Screen.ExternalPlayer.createRoute(externalVideoUri.toString())) {
+                // Replace a player that is already open instead of stacking a second one
+                // (two ExoPlayers alive at once would both play and fight over the session).
+                if (current != null &&
+                    (current == Screen.Player.route || current == Screen.ExternalPlayer.route)
+                ) {
+                    popUpTo(current) { inclusive = true }
+                }
+            }
+            onExternalVideoHandled()
+        }
+    }
 
     NavHost(navController = navController, startDestination = Screen.Library.route) {
         composable(Screen.Library.route) {
@@ -118,7 +153,9 @@ fun PteronNavGraph(app: PteronApp) {
                 viewModel = viewModel,
                 onBack = navController::popBackStack,
                 onOpenVideo = { videoId, folderBucketId -> navController.navigate(Screen.Player.createRoute(videoId, folderBucketId)) },
-                onShufflePlay = { videoId, folderBucketId -> navController.navigate(Screen.Player.createRoute(videoId, folderBucketId)) }
+                onShufflePlay = { videoId, folderBucketId ->
+                    navController.navigate(Screen.Player.createRoute(videoId, folderBucketId, shuffle = true))
+                }
             )
         }
 
@@ -126,7 +163,11 @@ fun PteronNavGraph(app: PteronApp) {
             route = Screen.Player.route,
             arguments = listOf(
                 navArgument("videoId") { type = NavType.LongType },
-                navArgument("bucketId") { type = NavType.StringType }
+                navArgument("bucketId") { type = NavType.StringType },
+                navArgument("shuffle") {
+                    type = NavType.BoolType
+                    defaultValue = false
+                }
             ),
             enterTransition = { pushEnter },
             exitTransition = { pushExit },
@@ -135,15 +176,30 @@ fun PteronNavGraph(app: PteronApp) {
         ) { backStackEntry ->
             val videoId = backStackEntry.arguments?.getLong("videoId") ?: return@composable
             val bucketId = backStackEntry.arguments?.getString("bucketId").orEmpty()
-            val viewModel: PlayerViewModel = viewModel(
-                factory = PlayerViewModel.Factory(
-                    app, app.mediaStoreRepository, app.playbackStateRepository, app.appearancePrefsRepository, app.playbackPrefsRepository
-                )
-            )
+            val shuffle = backStackEntry.arguments?.getBoolean("shuffle") ?: false
             PlayerScreen(
                 videoId = videoId,
                 bucketId = bucketId,
-                viewModel = viewModel,
+                shuffle = shuffle,
+                viewModel = rememberPlayerViewModel(app),
+                onBack = navController::popBackStack
+            )
+        }
+
+        composable(
+            route = Screen.ExternalPlayer.route,
+            arguments = listOf(navArgument("uri") { type = NavType.StringType }),
+            enterTransition = { pushEnter },
+            exitTransition = { pushExit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) { backStackEntry ->
+            val uri = backStackEntry.arguments?.getString("uri") ?: return@composable
+            PlayerScreen(
+                videoId = -1L,
+                bucketId = "",
+                externalUri = uri,
+                viewModel = rememberPlayerViewModel(app),
                 onBack = navController::popBackStack
             )
         }
