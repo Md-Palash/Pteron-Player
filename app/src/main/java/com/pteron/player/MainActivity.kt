@@ -1,7 +1,8 @@
 package com.pteron.player
 
 import android.app.PictureInPictureParams
-import android.content.res.Configuration
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Rational
@@ -18,9 +19,13 @@ import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.navigation.PteronNavGraph
 import com.pteron.player.theme.PteronTheme
 import com.pteron.player.util.PipController
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @UnstableApi
 class MainActivity : ComponentActivity() {
+
+    /** A video handed to us by another app (ACTION_VIEW), waiting for the nav graph to open it. */
+    private val pendingExternalVideo = MutableStateFlow<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -28,15 +33,37 @@ class MainActivity : ComponentActivity() {
 
         val app = application as PteronApp
 
+        // Only on a fresh launch: after a recreation the very same intent is still attached
+        // to the activity and would re-open the video the person already closed.
+        if (savedInstanceState == null) handleViewIntent(intent)
+
         setContent {
             val appearance by app.appearancePrefsRepository.state
                 .collectAsState(initial = AppearanceState())
+            val externalVideo by pendingExternalVideo.collectAsState()
 
             PteronTheme(appearance = appearance) {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    PteronNavGraph(app = app)
+                    PteronNavGraph(
+                        app = app,
+                        externalVideoUri = externalVideo,
+                        onExternalVideoHandled = { pendingExternalVideo.value = null }
+                    )
                 }
             }
+        }
+    }
+
+    // launchMode="singleTop": a second "Open with" while the app is already running lands here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleViewIntent(intent)
+    }
+
+    private fun handleViewIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_VIEW) {
+            intent.data?.let { pendingExternalVideo.value = it }
         }
     }
 
@@ -54,11 +81,5 @@ class MainActivity : ComponentActivity() {
                 .build()
             enterPictureInPictureMode(params)
         }
-    }
-
-    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
-        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
-        // The player screen keeps observing the same ExoPlayer instance regardless of PiP
-        // state, so no extra wiring is needed here beyond the system's own view resizing.
     }
 }
