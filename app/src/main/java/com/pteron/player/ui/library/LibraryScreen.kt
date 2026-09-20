@@ -22,13 +22,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.ViewList
-import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -44,13 +42,14 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.pteron.player.data.model.ViewMode
 import com.pteron.player.navigation.BottomNavDestination
+import com.pteron.player.ui.common.AppIcon
 import com.pteron.player.ui.common.EmptyLibraryState
 import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
 import com.pteron.player.ui.common.NoSearchResultsState
 import com.pteron.player.ui.common.PermissionRationaleState
 import com.pteron.player.ui.common.PteronBottomNavBar
-import com.pteron.player.ui.common.TwoLineTitle
+import com.pteron.player.ui.common.SearchCard
 import com.pteron.player.ui.common.videoLibraryPermission
 import com.pteron.player.ui.library.components.ContinueWatchingCard
 import com.pteron.player.ui.library.components.FolderCard
@@ -93,7 +92,8 @@ fun LibraryScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { TwoLineTitle(subtitle = "PTERON PLAYER", title = "Library") },
+                title = {},
+                navigationIcon = { AppIcon(modifier = Modifier.padding(start = 16.dp, end = 8.dp)) },
                 actions = {
                     IconButton(onClick = { viewModeOverride = if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID }) {
                         Icon(
@@ -149,13 +149,11 @@ private fun LibraryContent(
     val filtered = uiState.filteredFolders
 
     Column(modifier = Modifier.fillMaxSize()) {
-        OutlinedTextField(
+        SearchCard(
             value = uiState.searchQuery,
             onValueChange = onSearchQueryChange,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            placeholder = { Text("Search folders...") },
-            leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },
-            singleLine = true
+            placeholder = "Search folders...",
+            modifier = Modifier.padding(16.dp)
         )
 
         if (uiState.searchQuery.isNotBlank() && filtered.isEmpty()) {
