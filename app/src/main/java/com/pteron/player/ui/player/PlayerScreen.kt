@@ -150,7 +150,14 @@ fun PlayerScreen(
     // notification). Closing the Picture-in-Picture window is the one case that should
     // stop playback: the system reports it as a stop while still in PiP mode.
     LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
-        if (activity?.isInPictureInPictureMode == true) viewModel.pause()
+        // Closing a floating Picture-in-Picture window is reported as a stop while technically
+        // still "in PiP" -- that's the one gesture that unambiguously means "done watching", so
+        // it pauses even with background play on. Otherwise (home button, screen lock), whether
+        // audio keeps going is exactly what the "Background play" setting controls.
+        val closedPipWindow = activity?.isInPictureInPictureMode == true
+        if (closedPipWindow || !uiState.playbackPrefs.backgroundPlaybackEnabled) {
+            viewModel.pause()
+        }
         viewModel.onUiVisibilityChanged(false)
     }
     LifecycleEventEffect(Lifecycle.Event.ON_START) {
