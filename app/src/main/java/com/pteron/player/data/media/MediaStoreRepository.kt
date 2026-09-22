@@ -38,46 +38,59 @@ class MediaStoreRepository(private val context: Context) {
     )
 
     /** Loads every video visible to the app, across all folders. */
-    suspend fun loadAllVideos(): List<VideoItem> = withContext(Dispatchers.IO) {
-        val results = mutableListOf<VideoItem>()
-        val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+    suspend fun loadAllVideos(): List<VideoItem> = queryVideos(selection = null, selectionArgs = null)
 
-        context.contentResolver.query(
-            collection,
-            projection,
-            null,
-            null,
-            "${MediaStore.Video.Media.DATE_ADDED} DESC"
-        )?.use { cursor ->
-            val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
-            val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
-            val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_ID)
-            val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
-            val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
-            val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
-            val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
-            val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
-            val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
+    /**
+     * Loads only the videos in one folder. Used to open a folder or start playback, so neither
+     * has to read and hold the entire device library (which can be thousands of rows) just to
+     * pull out one bucket's worth of items -- lighter on RAM, CPU and battery alike.
+     */
+    suspend fun loadVideosInBucket(bucketId: String): List<VideoItem> = queryVideos(
+        selection = "${MediaStore.Video.Media.BUCKET_ID} = ?",
+        selectionArgs = arrayOf(bucketId)
+    )
 
-            while (cursor.moveToNext()) {
-                val id = cursor.getLong(idCol)
-                val uri = ContentUris.withAppendedId(collection, id)
-                results += VideoItem(
-                    id = id,
-                    contentUri = uri.toString(),
-                    displayName = cursor.getString(nameCol) ?: "Untitled",
-                    bucketId = cursor.getString(bucketIdCol) ?: "unknown",
-                    durationMs = cursor.getLong(durationCol),
-                    sizeBytes = cursor.getLong(sizeCol),
-                    dateAddedSeconds = cursor.getLong(dateCol),
-                    width = cursor.getInt(widthCol),
-                    height = cursor.getInt(heightCol),
-                    mimeType = cursor.getString(mimeCol) ?: "video/*"
-                )
+    private suspend fun queryVideos(selection: String?, selectionArgs: Array<String>?): List<VideoItem> =
+        withContext(Dispatchers.IO) {
+            val results = mutableListOf<VideoItem>()
+            val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+
+            context.contentResolver.query(
+                collection,
+                projection,
+                selection,
+                selectionArgs,
+                "${MediaStore.Video.Media.DATE_ADDED} DESC"
+            )?.use { cursor ->
+                val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
+                val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
+                val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_ID)
+                val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
+                val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
+                val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
+                val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
+                val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
+
+                while (cursor.moveToNext()) {
+                    val id = cursor.getLong(idCol)
+                    val uri = ContentUris.withAppendedId(collection, id)
+                    results += VideoItem(
+                        id = id,
+                        contentUri = uri.toString(),
+                        displayName = cursor.getString(nameCol) ?: "Untitled",
+                        bucketId = cursor.getString(bucketIdCol) ?: "unknown",
+                        durationMs = cursor.getLong(durationCol),
+                        sizeBytes = cursor.getLong(sizeCol),
+                        dateAddedSeconds = cursor.getLong(dateCol),
+                        width = cursor.getInt(widthCol),
+                        height = cursor.getInt(heightCol),
+                        mimeType = cursor.getString(mimeCol) ?: "video/*"
+                    )
+                }
             }
+            results
         }
-        results
-    }
 
     /** Groups [loadAllVideos] results into folders, mirroring the device's real bucket structure. */
     suspend fun loadFolders(): List<VideoFolder> = withContext(Dispatchers.IO) {
