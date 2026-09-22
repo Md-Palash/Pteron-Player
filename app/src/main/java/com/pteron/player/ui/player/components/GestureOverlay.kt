@@ -1,7 +1,9 @@
 package com.pteron.player.ui.player.components
 
 import android.app.Activity
+import android.content.Context
 import android.media.AudioManager
+import android.provider.Settings
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -61,6 +64,14 @@ fun GestureOverlay(
     var isScrubbing by remember { mutableStateOf(false) }
     var dragStartedOnLeftHalf by remember { mutableStateOf(true) }
 
+    // Anchored at the start of each vertical drag so brightness/volume track the finger by a pure
+    // offset from where it began, rather than being recomputed from a system read on every pointer
+    // move. That avoids two sources of jumpiness: a stale/-1 "use system default" brightness value
+    // snapping to an arbitrary baseline, and a read-modify-write round trip drifting at the edges.
+    var brightnessAnchor by remember { mutableFloatStateOf(0.5f) }
+    var volumeIndexAnchor by remember { mutableIntStateOf(0) }
+    var volumeMaxAnchor by remember { mutableIntStateOf(1) }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -96,6 +107,9 @@ fun GestureOverlay(
                         scrubTargetMs = currentPositionMs.toFloat()
                         dragStartedOnLeftHalf = offset.x < containerSize.width / 2f
                         isScrubbing = false
+                        brightnessAnchor = currentWindowBrightness(activity, context)
+                        volumeIndexAnchor = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                        volumeMaxAnchor = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 1).coerceAtLeast(1)
                     },
                     onDragEnd = {
                         if (isScrubbing) {
@@ -123,10 +137,17 @@ fun GestureOverlay(
                             val heightPx = containerSize.height.takeIf { it > 0 } ?: 1
                             val fraction = (dragAmount.y / heightPx) * sensitivity
                             if (dragStartedOnLeftHalf) {
-                                onBrightnessChanged(adjustBrightness(activity, -fraction))
+                                brightnessAnchor = (brightnessAnchor - fraction).coerceIn(0.02f, 1f)
+                                applyWindowBrightness(activity, brightnessAnchor)
+                                onBrightnessChanged(brightnessAnchor)
                             } else {
-                                val (volFraction, current, max) = adjustVolume(audioManager, -fraction)
-                                onVolumeChanged(volFraction, current, max)
+                                val deltaSteps = -fraction * volumeMaxAnchor
+                                val target = (volumeIndexAnchor + deltaSteps).toInt().coerceIn(0, volumeMaxAnchor)
+                                if (target != volumeIndexAnchor) {
+                                    volumeIndexAnchor = target
+                                    audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+                                }
+                                onVolumeChanged(target.toFloat() / volumeMaxAnchor.toFloat(), target, volumeMaxAnchor)
                             }
                         }
                     }
@@ -135,24 +156,20 @@ fun GestureOverlay(
     )
 }
 
-private fun adjustBrightness(activity: Activity?, delta: Float): Float {
-    val window = activity?.window ?: return 0.5f
-    val current = window.attributes.screenBrightness.let { if (it < 0f) 0.5f else it }
-    val updated = (current + delta).coerceIn(0.02f, 1f)
-    val params = window.attributes
-    params.screenBrightness = updated
-    window.attributes = params
-    return updated
+/** The window's own brightness override, or the device's actual current system brightness if the
+ *  window hasn't overridden it yet -- so the very first drag of a session starts from where the
+ *  screen already visibly is, instead of snapping to an arbitrary 50% baseline. */
+private fun currentWindowBrightness(activity: Activity?, context: Context): Float {
+    val windowValue = activity?.window?.attributes?.screenBrightness ?: -1f
+    if (windowValue >= 0f) return windowValue
+    return runCatching {
+        Settings.System.getInt(context.contentResolver, Settings.System.SCREEN_BRIGHTNESS)
+    }.getOrDefault(128).coerceIn(0, 255) / 255f
 }
 
-/** Returns (newFraction, newStreamIndex, maxStreamIndex) so the caller can show "12/15"-style HUD text. */
-private fun adjustVolume(audioManager: AudioManager?, delta: Float): Triple<Float, Int, Int> {
-    val am = audioManager ?: return Triple(0f, 0, 1)
-    val max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
-    val current = am.getStreamVolume(AudioManager.STREAM_MUSIC)
-    val target = (current + (delta * max)).toInt().coerceIn(0, max)
-    if (target != current) {
-        am.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
-    }
-    return Triple(target.toFloat() / max.toFloat(), target, max)
+private fun applyWindowBrightness(activity: Activity?, value: Float) {
+    val window = activity?.window ?: return
+    val params = window.attributes
+    params.screenBrightness = value
+    window.attributes = params
 }

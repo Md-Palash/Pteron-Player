@@ -1,5 +1,11 @@
 package com.pteron.player.ui.player.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -11,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
@@ -39,19 +47,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.pteron.player.ui.player.RepeatMode
 import com.pteron.player.util.formatRemaining
@@ -102,16 +113,32 @@ fun PlayerTopBar(
                 }
                 androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
             }
-            if (isHardwareDecoder != null) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(if (isHardwareDecoder) Color(0xFFD26938).copy(alpha = 0.85f) else Color.White.copy(alpha = 0.15f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                ) {
-                    Text(if (isHardwareDecoder) "HW+" else "SW", style = MaterialTheme.typography.labelSmall, color = Color.White)
+            // A fade + tiny scale rather than an instant swap: the classification can settle a
+            // moment after a video starts (or after ExoPlayer falls back to another decoder), and
+            // popping the badge in/out abruptly read as a glitch rather than information arriving.
+            AnimatedVisibility(
+                visible = isHardwareDecoder != null,
+                enter = fadeIn(tween(220)) + scaleIn(tween(220), initialScale = 0.85f),
+                exit = fadeOut(tween(120))
+            ) {
+                Row {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(
+                                if (isHardwareDecoder == true) Color(0xFFD26938).copy(alpha = 0.85f)
+                                else Color.White.copy(alpha = 0.15f)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            if (isHardwareDecoder == true) "HW+" else "SW",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White
+                        )
+                    }
+                    androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
                 }
-                androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
             }
             IconButton(onClick = onToggleFavorite) {
                 Icon(
@@ -160,6 +187,16 @@ fun PlayerTopBar(
     }
 }
 
+/** One control bar entry: an icon button plus what it needs to draw and act. */
+private data class BarControl(
+    val icon: ImageVector,
+    val contentDescription: String,
+    val tint: Color,
+    val size: Dp = 22.dp,
+    val enabled: Boolean = true,
+    val onClick: () -> Unit
+)
+
 @Composable
 fun PlayerBottomBar(
     isPlaying: Boolean,
@@ -191,6 +228,9 @@ fun PlayerBottomBar(
     modifier: Modifier = Modifier
 ) {
     val seekSeconds = (seekStepMs / 1000L).toInt()
+    val playingTint = Color.White
+    val dimTint = Color.White.copy(alpha = 0.35f)
+
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -212,121 +252,97 @@ fun PlayerBottomBar(
             Text(formatRemaining(durationMs - currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.Center,
+        // Every control in one line, smaller and evenly spaced so shuffle through rotate all read
+        // as one continuous transport strip. It scrolls only if a narrow screen can't fit every
+        // icon at a comfortable tap size -- the play button stays the visual anchor in the middle.
+        val leadControls = listOf(
+            BarControl(Icons.Outlined.Shuffle, "Shuffle", if (shuffleEnabled) accentColor else dimTint) { onToggleShuffle() },
+            BarControl(Icons.Outlined.SkipPrevious, "Previous", if (hasPrevious) playingTint else dimTint, enabled = hasPrevious) { onPrevious() },
+            BarControl(Icons.Outlined.Replay, "Rewind $seekSeconds seconds", playingTint) { onSeekBy(-seekStepMs) }
+        )
+        val trailControls = listOf(
+            BarControl(Icons.Outlined.FastForward, "Forward $seekSeconds seconds", playingTint) { onSeekBy(seekStepMs) },
+            BarControl(Icons.Outlined.SkipNext, "Next", if (hasNext) playingTint else dimTint, enabled = hasNext) { onNext() },
+            BarControl(
+                if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
+                "Repeat: ${repeatMode.label}",
+                if (repeatMode == RepeatMode.OFF) dimTint else accentColor
+            ) { onCycleRepeat() },
+            BarControl(if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp, if (isMuted) "Unmute" else "Mute", playingTint) { onToggleMute() },
+            BarControl(if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen, "Lock controls", playingTint) { onToggleLock() },
+            BarControl(Icons.Outlined.PictureInPictureAlt, "Picture in picture", playingTint) { onEnterPip() },
+            BarControl(Icons.Outlined.AspectRatio, "Cycle aspect ratio", playingTint) { onCycleAspectRatio() },
+            BarControl(Icons.Outlined.ScreenRotation, "Rotate", playingTint) { onToggleRotation() }
+        )
+
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterHorizontally),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onToggleShuffle) {
-                Icon(
-                    Icons.Outlined.Shuffle,
-                    contentDescription = "Shuffle",
-                    tint = if (shuffleEnabled) accentColor else Color.White.copy(alpha = 0.6f)
-                )
-            }
-            IconButton(onClick = onPrevious, enabled = hasPrevious) {
-                Icon(Icons.Outlined.SkipPrevious, contentDescription = "Previous", tint = if (hasPrevious) Color.White else Color.White.copy(alpha = 0.3f))
-            }
-            IconButton(onClick = { onSeekBy(-seekStepMs) }) {
-                Icon(Icons.Outlined.Replay, contentDescription = "Rewind $seekSeconds seconds", tint = Color.White)
-            }
-            Box(
-                modifier = Modifier
-                    .padding(horizontal = 12.dp)
-                    .clip(RoundedCornerShape(50))
-                    .background(accentColor)
-                    .size(56.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(onClick = onPlayPause) {
-                    androidx.compose.animation.Crossfade(
-                        targetState = isPlaying,
-                        animationSpec = androidx.compose.animation.core.tween(150),
-                        label = "playPauseIcon"
-                    ) { playing ->
-                        Icon(
-                            imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            contentDescription = if (playing) "Pause" else "Play",
-                            // Readable on any accent: white on deep accents, dark on bright ones.
-                            tint = if (accentColor.luminance() > 0.4f) Color.Black else Color.White,
-                            modifier = Modifier.size(32.dp)
-                        )
+            itemsIndexed(leadControls) { _, control -> BarIconButton(control) }
+            item { TextIconChip(text = "${playbackSpeed}x", icon = Icons.Outlined.Speed, onClick = onOpenSpeedMenu) }
+            item {
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = 6.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(accentColor)
+                        .size(48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    IconButton(onClick = onPlayPause) {
+                        androidx.compose.animation.Crossfade(
+                            targetState = isPlaying,
+                            animationSpec = tween(150),
+                            label = "playPauseIcon"
+                        ) { playing ->
+                            Icon(
+                                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                                contentDescription = if (playing) "Pause" else "Play",
+                                // Readable on any accent: white on deep accents, dark on bright ones.
+                                tint = if (accentColor.luminance() > 0.4f) Color.Black else Color.White,
+                                modifier = Modifier.size(26.dp)
+                            )
+                        }
                     }
                 }
             }
-            IconButton(onClick = { onSeekBy(seekStepMs) }) {
-                Icon(Icons.Outlined.FastForward, contentDescription = "Forward $seekSeconds seconds", tint = Color.White)
-            }
-            IconButton(onClick = onNext, enabled = hasNext) {
-                Icon(Icons.Outlined.SkipNext, contentDescription = "Next", tint = if (hasNext) Color.White else Color.White.copy(alpha = 0.3f))
-            }
-            IconButton(onClick = onCycleRepeat) {
-                Icon(
-                    imageVector = if (repeatMode == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
-                    contentDescription = "Repeat: ${repeatMode.label}",
-                    tint = if (repeatMode == RepeatMode.OFF) Color.White.copy(alpha = 0.6f) else accentColor
-                )
-            }
-        }
-
-        androidx.compose.foundation.lazy.LazyRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterHorizontally),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            item { TextIconChip(text = "${playbackSpeed}x", icon = Icons.Outlined.Speed, onClick = onOpenSpeedMenu) }
-            item {
-                IconButton(onClick = onToggleMute) {
-                    Icon(
-                        imageVector = if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                        contentDescription = if (isMuted) "Unmute" else "Mute",
-                        tint = Color.White
-                    )
-                }
-            }
-            item {
-                IconButton(onClick = onToggleLock) {
-                    Icon(
-                        imageVector = if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
-                        contentDescription = "Lock controls",
-                        tint = Color.White
-                    )
-                }
-            }
-            item {
-                IconButton(onClick = onEnterPip) {
-                    Icon(Icons.Outlined.PictureInPictureAlt, contentDescription = "Picture in picture", tint = Color.White)
-                }
-            }
-            item {
-                IconButton(onClick = onCycleAspectRatio) {
-                    Icon(Icons.Outlined.AspectRatio, contentDescription = "Cycle aspect ratio", tint = Color.White)
-                }
-            }
-            item {
-                IconButton(onClick = onToggleRotation) {
-                    Icon(Icons.Outlined.ScreenRotation, contentDescription = "Rotate", tint = Color.White)
-                }
-            }
+            itemsIndexed(trailControls) { _, control -> BarIconButton(control) }
         }
     }
 }
 
 @Composable
-private fun TextIconChip(text: String, icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+private fun BarIconButton(control: BarControl) {
+    IconButton(onClick = control.onClick, enabled = control.enabled, modifier = Modifier.size(36.dp)) {
+        Icon(
+            imageVector = control.icon,
+            contentDescription = control.contentDescription,
+            tint = control.tint,
+            modifier = Modifier.size(control.size)
+        )
+    }
+}
+
+@Composable
+private fun TextIconChip(text: String, icon: ImageVector, onClick: () -> Unit) {
     Row(
         modifier = Modifier
             .clip(RoundedCornerShape(50))
             .background(Color.White.copy(alpha = 0.15f))
             .pointerInput(Unit) { detectTapGestures { onClick() } }
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(15.dp))
-        Text(text, color = Color.White, style = MaterialTheme.typography.labelMedium)
+        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+        Text(text, color = Color.White, style = MaterialTheme.typography.labelSmall)
     }
 }
+
+/** Effectively instant: used to keep the scrubber's fill glued to the finger while dragging. */
+private val snapSpec = tween<Float>(durationMillis = 0)
 
 @Composable
 private fun Scrubber(
@@ -338,16 +354,19 @@ private fun Scrubber(
 ) {
     val progress = if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
     val buffered = (bufferedPercentage / 100f).coerceIn(0f, 1f)
-    // Animated rather than snapping instantly, so the played/buffered fill glides
-    // forward smoothly each tick instead of jumping in visible steps.
-    val animatedProgress by androidx.compose.animation.core.animateFloatAsState(
+
+    // While the finger is actually on the bar, the fill must track it exactly -- animating here
+    // would make it lag a beat behind the touch and feel unstable. The tween is only for the
+    // normal once-a-second playback tick, where a glide reads as smooth rather than a jump.
+    var isDragging by remember { mutableStateOf(false) }
+    val animatedProgress by animateFloatAsState(
         targetValue = progress,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 250),
+        animationSpec = if (isDragging) snapSpec else tween(durationMillis = 250),
         label = "scrubberProgress"
     )
-    val animatedBuffered by androidx.compose.animation.core.animateFloatAsState(
+    val animatedBuffered by animateFloatAsState(
         targetValue = buffered,
-        animationSpec = androidx.compose.animation.core.tween(durationMillis = 250),
+        animationSpec = tween(durationMillis = 250),
         label = "scrubberBuffered"
     )
 
@@ -366,7 +385,11 @@ private fun Scrubber(
                 }
             }
             .pointerInput(durationMs, trackWidthPx) {
-                detectDragGestures { change, _ ->
+                detectDragGestures(
+                    onDragStart = { isDragging = true },
+                    onDragEnd = { isDragging = false },
+                    onDragCancel = { isDragging = false }
+                ) { change, _ ->
                     if (durationMs > 0 && trackWidthPx > 0) {
                         val fraction = (change.position.x / trackWidthPx).coerceIn(0f, 1f)
                         onScrub((fraction * durationMs).toLong())
