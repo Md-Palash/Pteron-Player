@@ -133,6 +133,15 @@ class PlayerViewModel(
     // fall back to the next one instead of surfacing a playback error.
     private val renderersFactory = DefaultRenderersFactory(application)
         .setEnableDecoderFallback(true)
+        // Higher-precision internal audio pipeline (fewer rounding artifacts, most useful
+        // together with the audio-boost feature below). Falls back silently on devices/paths
+        // that don't support float output.
+        .setEnableAudioFloatOutput(true)
+        // If an audio decoder extension (e.g. an FFmpeg build for DTS/AC-3/ALAC) is ever added
+        // to the app, prefer it over the platform decoder for formats both can play. With no
+        // extension present -- the default today -- this has no effect; the platform decoders
+        // (AAC, MP3, Opus, Vorbis, FLAC, PCM) already cover the formats most videos use.
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
 
     val player: ExoPlayer = ExoPlayer.Builder(application, renderersFactory)
         .setTrackSelector(trackSelector)
@@ -148,6 +157,12 @@ class PlayerViewModel(
         // Pause when headphones are unplugged / Bluetooth disconnects.
         .setHandleAudioBecomingNoisy(true)
         .build()
+        .apply {
+            // Holds a plain CPU wake lock only while actually playing (released the instant
+            // playback pauses), so audio keeps decoding smoothly with the screen off -- for
+            // background play and lock-screen playback -- without ever draining battery while idle.
+            setWakeMode(C.WAKE_MODE_LOCAL)
+        }
 
     // Exposes this player to the system (notification + lock screen controls,
     // headphone/Bluetooth media-button routing) via a MediaSessionService that
@@ -212,6 +227,10 @@ class PlayerViewModel(
                     aspectRatioMode = if (startingUp) prefs.defaultAspectRatio else _uiState.value.aspectRatioMode
                 )
                 applyAudioBoost(prefs.audioBoostEnabled, prefs.audioBoostLevel)
+                // Read synchronously by MainActivity.onUserLeaveHint(), a plain (non-suspend)
+                // Activity callback, to decide whether to skip auto-PiP in favor of plain
+                // background audio.
+                PipController.backgroundPlaybackEnabled.value = prefs.backgroundPlaybackEnabled
             }
         }
 
@@ -362,8 +381,16 @@ class PlayerViewModel(
             ) {
                 val isSoftware = decoderName.contains("google", ignoreCase = true) ||
                     decoderName.startsWith("c2.android", ignoreCase = true) ||
-                    decoderName.startsWith("OMX.android", ignoreCase = true)
-                _uiState.value = _uiState.value.copy(isHardwareDecoder = !isSoftware)
+                    decoderName.startsWith("OMX.android", ignoreCase = true) ||
+                    decoderName.startsWith("OMX.ffmpeg", ignoreCase = true) ||
+                    decoderName.contains("sw.", ignoreCase = true)
+                val nowHardware = !isSoftware
+                // Decoder fallback can briefly initialize more than one decoder for the same
+                // video; only touch the badge when the classification actually changes so it
+                // doesn't flicker between HW+/SW while that settles.
+                if (_uiState.value.isHardwareDecoder != nowHardware) {
+                    _uiState.value = _uiState.value.copy(isHardwareDecoder = nowHardware)
+                }
             }
         })
     }
@@ -395,10 +422,14 @@ class PlayerViewModel(
         openedKey = key
 
         viewModelScope.launch {
-            val allVideos = mediaStoreRepository.loadAllVideos()
-            var playlist = allVideos.filter { it.bucketId == bucketId }
+            // Only this folder's rows, not the whole device library (see MediaStoreRepository) --
+            // opening a video is on the critical path to first frame, so this matters for RAM,
+            // CPU and battery alike, especially on large libraries.
+            var playlist = mediaStoreRepository.loadVideosInBucket(bucketId)
             if (playlist.none { it.id == videoId }) {
-                allVideos.firstOrNull { it.id == videoId }?.let { playlist = listOf(it) }
+                // Rare: the video isn't in the bucket it claims (e.g. stale MediaStore data).
+                // Fall back to a full scan rather than failing to open it.
+                mediaStoreRepository.loadAllVideos().firstOrNull { it.id == videoId }?.let { playlist = listOf(it) }
             }
             if (playlist.isEmpty()) {
                 openedKey = null
