@@ -90,8 +90,8 @@ class FolderViewModel(
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
             try {
-                val allVideos = mediaStoreRepository.loadAllVideos()
-                _rawVideos.value = allVideos.filter { it.bucketId == bucketId }
+                // Only this folder's rows, not the whole device library (see MediaStoreRepository).
+                _rawVideos.value = mediaStoreRepository.loadVideosInBucket(bucketId)
                 _uiState.value = _uiState.value.copy(isLoading = false)
             } catch (t: Throwable) {
                 _uiState.value = _uiState.value.copy(
