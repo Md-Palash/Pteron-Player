@@ -31,7 +31,10 @@ data class PlaybackPrefsState(
     val orientationLock: OrientationLock = OrientationLock.AUTO,
     val defaultAspectRatio: AspectRatioMode = AspectRatioMode.FILL,
     /** How long the player controls stay visible before auto-hiding, while playing and unlocked. */
-    val controlAutoHideSeconds: Int = 4
+    val controlAutoHideSeconds: Int = 4,
+    /** Keep audio playing (video decode off) when the app is minimized, the screen locks, or a
+     *  floating Picture-in-Picture window is closed -- like a music player, instead of pausing. */
+    val backgroundPlaybackEnabled: Boolean = false
 )
 
 /**
@@ -52,6 +55,7 @@ class PlaybackPrefsRepository(private val context: Context) {
         val ORIENTATION_LOCK = stringPreferencesKey("orientation_lock")
         val DEFAULT_ASPECT_RATIO = stringPreferencesKey("default_aspect_ratio")
         val CONTROL_AUTO_HIDE_SECONDS = intPreferencesKey("control_auto_hide_seconds")
+        val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback_enabled")
     }
 
     val state: Flow<PlaybackPrefsState> = context.playbackPrefsDataStore.data.map { prefs ->
@@ -69,7 +73,8 @@ class PlaybackPrefsRepository(private val context: Context) {
             defaultAspectRatio = runCatching {
                 AspectRatioMode.valueOf(prefs[Keys.DEFAULT_ASPECT_RATIO] ?: AspectRatioMode.FILL.name)
             }.getOrDefault(AspectRatioMode.FILL),
-            controlAutoHideSeconds = prefs[Keys.CONTROL_AUTO_HIDE_SECONDS] ?: 4
+            controlAutoHideSeconds = prefs[Keys.CONTROL_AUTO_HIDE_SECONDS] ?: 4,
+            backgroundPlaybackEnabled = prefs[Keys.BACKGROUND_PLAYBACK] ?: false
         )
     }
 
@@ -83,6 +88,7 @@ class PlaybackPrefsRepository(private val context: Context) {
     suspend fun setOrientationLock(lock: OrientationLock) = edit { it[Keys.ORIENTATION_LOCK] = lock.name }
     suspend fun setDefaultAspectRatio(mode: AspectRatioMode) = edit { it[Keys.DEFAULT_ASPECT_RATIO] = mode.name }
     suspend fun setControlAutoHideSeconds(seconds: Int) = edit { it[Keys.CONTROL_AUTO_HIDE_SECONDS] = seconds.coerceIn(1, 15) }
+    suspend fun setBackgroundPlaybackEnabled(value: Boolean) = edit { it[Keys.BACKGROUND_PLAYBACK] = value }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.playbackPrefsDataStore.edit(block)
