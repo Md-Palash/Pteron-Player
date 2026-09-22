@@ -546,6 +546,13 @@ private fun PlaybackBehaviorCard(prefs: PlaybackPrefsState, viewModel: SettingsV
                 checked = prefs.autoPlayNext,
                 onCheckedChange = viewModel::setAutoPlayNext
             )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            SettingsSwitchRow(
+                title = "Background play",
+                subtitle = "Keep audio playing when you minimize the app or lock the screen",
+                checked = prefs.backgroundPlaybackEnabled,
+                onCheckedChange = viewModel::setBackgroundPlaybackEnabled
+            )
         }
     }
 }

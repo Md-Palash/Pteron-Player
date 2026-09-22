@@ -41,6 +41,7 @@ class SettingsViewModel(
 
     fun setResumePlaybackEnabled(value: Boolean) = viewModelScope.launch { playbackPrefsRepository.setResumePlaybackEnabled(value) }
     fun setAutoPlayNext(value: Boolean) = viewModelScope.launch { playbackPrefsRepository.setAutoPlayNext(value) }
+    fun setBackgroundPlaybackEnabled(value: Boolean) = viewModelScope.launch { playbackPrefsRepository.setBackgroundPlaybackEnabled(value) }
     fun setDoubleTapSeekSeconds(seconds: Int) = viewModelScope.launch { playbackPrefsRepository.setDoubleTapSeekSeconds(seconds) }
     fun setAudioBoostEnabled(value: Boolean) = viewModelScope.launch { playbackPrefsRepository.setAudioBoostEnabled(value) }
     fun setAudioBoostLevel(value: Float) = viewModelScope.launch { playbackPrefsRepository.setAudioBoostLevel(value) }
