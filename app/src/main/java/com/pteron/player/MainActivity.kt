@@ -84,7 +84,13 @@ class MainActivity : ComponentActivity() {
      */
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && PipController.isEligibleForAutoPip.value) {
+        // With background play on, the point is to keep just the audio going -- like a music
+        // player -- so a floating PiP window is skipped entirely rather than opened and then
+        // immediately fought with.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            PipController.isEligibleForAutoPip.value &&
+            !PipController.backgroundPlaybackEnabled.value
+        ) {
             val aspect = PipController.videoAspectRatio.value.coerceIn(0.42f, 2.39f)
             val params = PictureInPictureParams.Builder()
                 .setAspectRatio(Rational((aspect * 100).toInt(), 100))
