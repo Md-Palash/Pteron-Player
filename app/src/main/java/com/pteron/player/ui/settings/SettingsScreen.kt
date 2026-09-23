@@ -211,7 +211,8 @@ private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
     }
 }
 
-/** A card in the theme's medium shade; every card in Settings goes through here. */
+/** A card in the theme's medium shade, corners rounded more than the video/library cards --
+ *  every detail card inside a Settings section goes through here. */
 @Composable
 private fun SettingsCard(
     modifier: Modifier = Modifier,
@@ -219,6 +220,7 @@ private fun SettingsCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         content = content
     )
