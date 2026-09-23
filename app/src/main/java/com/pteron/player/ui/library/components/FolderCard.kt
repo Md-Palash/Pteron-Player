@@ -66,7 +66,7 @@ fun FolderCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(1.5f)
-                .clip(RoundedCornerShape(18.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(folderColor)
                 .bouncyClickable(onClick = onClick)
                 .padding(14.dp),
@@ -142,7 +142,7 @@ fun FolderListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .bouncyClickable(onClick = onClick)
             .padding(12.dp),

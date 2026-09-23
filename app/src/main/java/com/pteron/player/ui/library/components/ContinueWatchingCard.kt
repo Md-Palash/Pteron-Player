@@ -19,6 +19,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -27,37 +28,71 @@ import com.pteron.player.ui.common.ThumbnailImage
 import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.util.formatTimecode
 
+/**
+ * Square card (the one card shape in the app that isn't rectangular) -- the thumbnail fills the
+ * whole square edge to edge, with a bottom scrim carrying the title, remaining time and a thin
+ * resume-progress bar, plus a centered play affordance.
+ */
 @Composable
 fun ContinueWatchingCard(video: VideoItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    Column(
+    val remaining = (video.durationMs - video.lastPositionMs).coerceAtLeast(0)
+
+    Box(
         modifier = modifier
-            .width(200.dp)
-            .clip(RoundedCornerShape(16.dp))
+            .width(180.dp)
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .bouncyClickable(onClick = onClick)
     ) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f)) {
-            ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
+        ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center
+        ) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.primary)
+                    .padding(10.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.primary)
-                        .padding(8.dp)
-                ) {
-                    Icon(Icons.Filled.PlayArrow, contentDescription = "Resume", tint = MaterialTheme.colorScheme.onPrimary)
-                }
+                Icon(Icons.Filled.PlayArrow, contentDescription = "Resume", tint = MaterialTheme.colorScheme.onPrimary)
             }
+        }
+
+        // Bottom scrim keeps the title/time readable over any thumbnail without a hard edge.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f))
+                    )
+                )
+                .padding(top = 20.dp, start = 10.dp, end = 10.dp, bottom = 8.dp)
+        ) {
+            Text(
+                text = video.displayName,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = "${formatTimecode(remaining)} left",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.85f)
+            )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(top = 6.dp)
                     .height(3.dp)
-                    .align(Alignment.BottomCenter)
+                    .clip(RoundedCornerShape(50))
                     .background(Color.White.copy(alpha = 0.3f))
             ) {
                 Box(
@@ -67,20 +102,6 @@ fun ContinueWatchingCard(video: VideoItem, onClick: () -> Unit, modifier: Modifi
                         .background(MaterialTheme.colorScheme.primary)
                 )
             }
-        }
-        Column(modifier = Modifier.padding(10.dp)) {
-            Text(
-                text = video.displayName,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            val remaining = (video.durationMs - video.lastPositionMs).coerceAtLeast(0)
-            Text(
-                text = "${formatTimecode(remaining)} left",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }
