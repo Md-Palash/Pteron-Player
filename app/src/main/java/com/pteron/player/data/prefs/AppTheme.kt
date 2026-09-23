@@ -3,10 +3,13 @@ package com.pteron.player.data.prefs
 /**
  * The ready-made themes. Every theme is three shades of one color, and each shade has one job:
  *
- *  - [backgroundHex]  the lightest shade: the screen background
+ *  - [backgroundHex]  the lightest shade: the screen background -- mostly white/near-black with
+ *                     only a subtle touch of the theme color, never a strong tint
  *  - [cardHex]        the medium shade: every card (settings, continue watching, video tiles,
- *                     dialogs, menus) plus the top and bottom bars
- *  - [accentHex]      the darkest shade: folder icons, selected options and toggle switches
+ *                     dialogs, menus) plus the top and bottom bars -- a soft, light version of
+ *                     the theme color, closer to pastel than to a saturated block of color
+ *  - [accentHex]      the darkest shade: folder icons, selected options and toggle switches --
+ *                     softened rather than a harsh, fully-saturated color
  *
  * Dark themes follow the same three roles, just inverted: a very dark background, slightly
  * lighter cards, and a bright accent.
@@ -18,11 +21,11 @@ enum class AppTheme(
     val cardHex: String,
     val accentHex: String
 ) {
-    TERRACOTTA("Terracotta", false, "#FAF1E8", "#EFD9C6", "#9A4420"),
-    SAGE("Sage", false, "#F1F4EA", "#DCE5CB", "#3F5A24"),
-    OCEAN("Ocean", false, "#EEF4F9", "#D3E3EF", "#1F5478"),
-    ROSE("Rose", false, "#FAEFF0", "#F0D6D9", "#8F2A3D"),
-    LAVENDER("Lavender", false, "#F4F0FA", "#E3D9F2", "#55379A"),
+    TERRACOTTA("Terracotta", false, "#FDF8F3", "#F6E2D2", "#A8562E"),
+    SAGE("Sage", false, "#F8FAF4", "#E4EAD6", "#52713A"),
+    OCEAN("Ocean", false, "#F5F9FC", "#DEEAF4", "#2E6690"),
+    ROSE("Rose", false, "#FDF6F7", "#F5DFE2", "#A6394E"),
+    LAVENDER("Lavender", false, "#F9F6FC", "#EAE1F5", "#6B4AAE"),
 
     ESPRESSO("Espresso", true, "#1C1512", "#2E241D", "#E8925E"),
     MIDNIGHT("Midnight", true, "#0E141C", "#1B2735", "#6FB3E8"),
