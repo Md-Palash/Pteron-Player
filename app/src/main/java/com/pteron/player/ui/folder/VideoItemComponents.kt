@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -47,9 +48,16 @@ import com.pteron.player.util.formatFileSize
 import com.pteron.player.util.formatPercent
 import com.pteron.player.util.formatTimecode
 
-/** Every video is a rounded card in the theme's medium shade. */
-private val VideoCardShape = RoundedCornerShape(20.dp)
-private val VideoThumbShape = RoundedCornerShape(14.dp)
+/**
+ * Every video is a rectangular card, corners rounded a bit (lighter than the Settings cards, so
+ * the two read as different tiers). The thumbnail sits flush against the card's own edges and
+ * shares its corner radius on that side, so it reads as part of the card rather than a separate
+ * image dropped on top of it -- only the text underneath/beside it gets its own inset padding.
+ */
+private const val CardRadiusDp = 12
+private val VideoCardShape = RoundedCornerShape(CardRadiusDp.dp)
+private val ThumbTopShape = RoundedCornerShape(topStart = CardRadiusDp.dp, topEnd = CardRadiusDp.dp)
+private val ThumbStartShape = RoundedCornerShape(topStart = CardRadiusDp.dp, bottomStart = CardRadiusDp.dp)
 
 /** Card chrome shared by the list row and the grid tile: rounded, medium shade, soft outline. */
 @Composable
@@ -71,15 +79,14 @@ fun VideoListRow(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .height(104.dp)
             .videoCard(onClick)
-            .padding(10.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
             modifier = Modifier
-                .width(112.dp)
-                .height(80.dp)
-                .clip(VideoThumbShape)
+                .width(132.dp)
+                .fillMaxHeight()
+                .clip(ThumbStartShape)
         ) {
             ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
             Box(
@@ -123,7 +130,7 @@ fun VideoListRow(
             }
         }
 
-        Column(modifier = Modifier.weight(1f)) {
+        Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = video.displayName,
@@ -210,8 +217,8 @@ fun VideoGridTile(
     onClearProgress: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.videoCard(onClick).padding(8.dp)) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(VideoThumbShape)) {
+    Column(modifier = modifier.videoCard(onClick)) {
+        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(ThumbTopShape)) {
             ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
             Box(
                 modifier = Modifier
@@ -278,7 +285,7 @@ fun VideoGridTile(
                 }
             }
         }
-        Column(modifier = Modifier.padding(start = 4.dp, end = 4.dp, top = 8.dp, bottom = 2.dp)) {
+        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(video.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (video.lastPositionMs > 0L && !video.isWatched) {
                 Text(
