@@ -2,6 +2,9 @@ package com.pteron.player.theme
 
 import android.app.Activity
 import android.graphics.drawable.ColorDrawable
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
@@ -9,6 +12,7 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
@@ -129,7 +133,19 @@ fun PteronTheme(
     theme: AppTheme = AppTheme.DEFAULT,
     content: @Composable () -> Unit
 ) {
-    val colors = remember(theme) { theme.colors() }
+    val target = remember(theme) { theme.colors() }
+
+    // Cross-fades the three shades themselves when a new theme is picked, instead of every
+    // Material color role snapping at once -- a soft, unified transition rather than a flicker
+    // across dozens of surfaces. Normal recompositions (not a theme change) settle instantly
+    // since target == current already.
+    val animSpec = tween<Color>(durationMillis = 280, easing = FastOutSlowInEasing)
+    val animatedBackground by animateColorAsState(target.background, animSpec, label = "themeBackground")
+    val animatedCard by animateColorAsState(target.card, animSpec, label = "themeCard")
+    val animatedAccent by animateColorAsState(target.accent, animSpec, label = "themeAccent")
+    val colors = remember(animatedBackground, animatedCard, animatedAccent, target.isDark) {
+        ThemeColors(animatedBackground, animatedCard, animatedAccent, target.isDark)
+    }
     val colorScheme = remember(colors) { colors.toColorScheme() }
 
     // The theme decides light or dark, not the phone: keep the status/navigation bar icons
@@ -138,10 +154,10 @@ fun PteronTheme(
     if (!view.isInEditMode) {
         LaunchedEffect(theme) {
             val window = (view.context as? Activity)?.window ?: return@LaunchedEffect
-            window.setBackgroundDrawable(ColorDrawable(colors.background.toArgb()))
+            window.setBackgroundDrawable(ColorDrawable(target.background.toArgb()))
             val controller = WindowCompat.getInsetsController(window, view)
-            controller.isAppearanceLightStatusBars = !colors.isDark
-            controller.isAppearanceLightNavigationBars = !colors.isDark
+            controller.isAppearanceLightStatusBars = !target.isDark
+            controller.isAppearanceLightNavigationBars = !target.isDark
         }
     }
 
