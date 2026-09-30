@@ -50,7 +50,7 @@ fun FolderCard(
 ) {
     val folderColor = MaterialTheme.colorScheme.primary
     val onFolder = MaterialTheme.colorScheme.onPrimary
-    Box(modifier = modifier.aspectRatio(1.5f)) {
+    Box(modifier = modifier.aspectRatio(1.65f)) {
         // Folder tab, peeking out above the card's top-left corner.
         Box(
             modifier = Modifier
@@ -65,11 +65,11 @@ fun FolderCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1.5f)
+                .aspectRatio(1.65f)
                 .clip(RoundedCornerShape(12.dp))
                 .background(folderColor)
                 .bouncyClickable(onClick = onClick)
-                .padding(14.dp),
+                .padding(11.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
@@ -79,7 +79,7 @@ fun FolderCard(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(30.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceContainer),
                     contentAlignment = Alignment.Center

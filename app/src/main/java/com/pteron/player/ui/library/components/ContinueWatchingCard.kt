@@ -29,9 +29,9 @@ import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.util.formatTimecode
 
 /**
- * Square card (the one card shape in the app that isn't rectangular) -- the thumbnail fills the
- * whole square edge to edge, with a bottom scrim carrying the title, remaining time and a thin
- * resume-progress bar, plus a centered play affordance.
+ * A slightly tall rectangular card -- the thumbnail fills the whole card edge to edge, with a
+ * bottom scrim carrying the title, remaining time and a thin resume-progress bar, plus a
+ * centered play affordance.
  */
 @Composable
 fun ContinueWatchingCard(video: VideoItem, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -40,7 +40,7 @@ fun ContinueWatchingCard(video: VideoItem, onClick: () -> Unit, modifier: Modifi
     Box(
         modifier = modifier
             .width(180.dp)
-            .aspectRatio(1f)
+            .aspectRatio(0.8f)
             .clip(RoundedCornerShape(20.dp))
             .background(MaterialTheme.colorScheme.surfaceContainer)
             .bouncyClickable(onClick = onClick)
