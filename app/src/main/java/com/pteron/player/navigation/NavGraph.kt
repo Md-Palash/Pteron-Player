@@ -8,6 +8,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -29,6 +30,7 @@ import com.pteron.player.ui.settings.SettingsScreen
 import com.pteron.player.ui.settings.SettingsViewModel
 import com.pteron.player.ui.videos.VideosScreen
 import com.pteron.player.ui.videos.VideosViewModel
+import kotlinx.coroutines.launch
 
 /**
  * Standard single-top bottom-nav pattern: switching tabs pops back to the
@@ -119,7 +121,11 @@ fun PteronNavGraph(
         }
 
         composable(Screen.Playlists.route) {
-            PlaylistsScreen(onNavigate = navController::navigateToTab)
+            val scope = rememberCoroutineScope()
+            PlaylistsScreen(
+                onNavigate = navController::navigateToTab,
+                onToggleDarkMode = { scope.launch { app.appearancePrefsRepository.toggleDarkMode() } }
+            )
         }
 
         composable(Screen.Settings.route) {
