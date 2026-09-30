@@ -54,7 +54,7 @@ import com.pteron.player.util.formatTimecode
  * shares its corner radius on that side, so it reads as part of the card rather than a separate
  * image dropped on top of it -- only the text underneath/beside it gets its own inset padding.
  */
-private const val CardRadiusDp = 12
+private const val CardRadiusDp = 18
 private val VideoCardShape = RoundedCornerShape(CardRadiusDp.dp)
 private val ThumbTopShape = RoundedCornerShape(topStart = CardRadiusDp.dp, topEnd = CardRadiusDp.dp)
 private val ThumbStartShape = RoundedCornerShape(topStart = CardRadiusDp.dp, bottomStart = CardRadiusDp.dp)

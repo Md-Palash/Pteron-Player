@@ -137,6 +137,10 @@ class FolderViewModel(
     /** Returns a shuffled play order starting from a random visible video, for the Shuffle Play FAB. */
     fun shufflePlayOrder(): List<VideoItem> = _uiState.value.visibleVideos.shuffled()
 
+    fun toggleDarkMode() {
+        viewModelScope.launch { appearancePrefsRepository.toggleDarkMode() }
+    }
+
     class Factory(
         private val bucketId: String,
         private val folderName: String,
