@@ -11,6 +11,7 @@ import com.pteron.player.data.model.SortOption
 import com.pteron.player.data.model.ViewMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
@@ -42,6 +43,8 @@ class AppearancePrefsRepository(private val context: Context) {
         val SORT_OPTION = stringPreferencesKey("sort_option")
         val SORT_DIRECTION = stringPreferencesKey("sort_direction")
         val DEFAULT_SPEED = floatPreferencesKey("default_playback_speed")
+        val LAST_LIGHT_THEME = stringPreferencesKey("last_light_theme")
+        val LAST_DARK_THEME = stringPreferencesKey("last_dark_theme")
     }
 
     // DataStore can only be read asynchronously, which would mean a first frame in the wrong
@@ -75,7 +78,21 @@ class AppearancePrefsRepository(private val context: Context) {
         )
     }
 
-    suspend fun setTheme(theme: AppTheme) = edit { it[Keys.APP_THEME] = theme.name }
+    suspend fun setTheme(theme: AppTheme) = edit {
+        it[Keys.APP_THEME] = theme.name
+        // Remembered per family so the quick dark-mode toggle can restore whichever light/dark
+        // theme the person actually chose, instead of always jumping to a fixed default.
+        if (theme.isDark) it[Keys.LAST_DARK_THEME] = theme.name else it[Keys.LAST_LIGHT_THEME] = theme.name
+    }
+
+    /** Flips between the last light theme and the last dark theme the person used. */
+    suspend fun toggleDarkMode() {
+        val prefs = context.appearanceDataStore.data.first()
+        val current = AppTheme.fromName(prefs[Keys.APP_THEME])
+        val lastLight = prefs[Keys.LAST_LIGHT_THEME]?.let { AppTheme.fromName(it) } ?: AppTheme.DEFAULT
+        val lastDark = prefs[Keys.LAST_DARK_THEME]?.let { AppTheme.fromName(it) } ?: AppTheme.ESPRESSO
+        setTheme(if (current.isDark) lastLight else lastDark)
+    }
     suspend fun setShowVideoCountBadge(value: Boolean) = edit { it[Keys.SHOW_VIDEO_COUNT] = value }
     suspend fun setShowFolderSizeBadge(value: Boolean) = edit { it[Keys.SHOW_FOLDER_SIZE] = value }
     suspend fun setGestureSensitivity(value: Float) = edit { it[Keys.GESTURE_SENSITIVITY] = value.coerceIn(0.5f, 2.0f) }
