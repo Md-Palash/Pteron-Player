@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,16 +22,14 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.ViewList
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -46,6 +45,7 @@ import androidx.core.content.ContextCompat
 import com.pteron.player.data.model.ViewMode
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.AppIcon
+import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.EmptyLibraryState
 import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
@@ -57,6 +57,9 @@ import com.pteron.player.ui.common.videoLibraryPermission
 import com.pteron.player.ui.library.components.ContinueWatchingCard
 import com.pteron.player.ui.library.components.FolderCard
 import com.pteron.player.ui.library.components.FolderListRow
+
+/** Extra bottom padding so scrollable content never sits behind the floating nav pill. */
+private val BottomNavClearance = 108.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -92,10 +95,19 @@ fun LibraryScreen(
     var viewModeOverride by remember { mutableStateOf<ViewMode?>(null) }
     val effectiveViewMode = viewModeOverride ?: uiState.appearance.viewMode
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
+    Scaffold { insets ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(insets)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         AppIcon(size = 30.dp)
                         Spacer(Modifier.size(10.dp))
@@ -105,47 +117,56 @@ fun LibraryScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     }
-                },
-                actions = {
-                    IconButton(onClick = { viewModeOverride = if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID }) {
-                        Icon(
-                            imageVector = if (effectiveViewMode == ViewMode.GRID) Icons.Outlined.ViewList else Icons.Outlined.GridView,
-                            contentDescription = "Toggle grid or list view"
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CircularActionButton(
+                            icon = if (effectiveViewMode == ViewMode.GRID) Icons.Outlined.ViewList else Icons.Outlined.GridView,
+                            contentDescription = "Toggle grid or list view",
+                            onClick = { viewModeOverride = if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID }
+                        )
+                        CircularActionButton(
+                            icon = Icons.Outlined.DarkMode,
+                            contentDescription = "Toggle dark mode",
+                            onClick = viewModel::toggleDarkMode
                         )
                     }
                 }
-            )
-        },
-        bottomBar = { PteronBottomNavBar(current = BottomNavDestination.LIBRARY, onSelect = onNavigate) }
-    ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when {
-                uiState.permission == PermissionUiState.DENIED -> PermissionRationaleState(
-                    onRequestPermission = { permissionLauncher.launch(videoLibraryPermission) },
-                    permanentlyDenied = false,
-                    onOpenSettings = {}
-                )
-                uiState.permission == PermissionUiState.PERMANENTLY_DENIED -> PermissionRationaleState(
-                    onRequestPermission = {},
-                    permanentlyDenied = true,
-                    onOpenSettings = {
-                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                            data = Uri.fromParts("package", context.packageName, null)
+
+                when {
+                    uiState.permission == PermissionUiState.DENIED -> PermissionRationaleState(
+                        onRequestPermission = { permissionLauncher.launch(videoLibraryPermission) },
+                        permanentlyDenied = false,
+                        onOpenSettings = {}
+                    )
+                    uiState.permission == PermissionUiState.PERMANENTLY_DENIED -> PermissionRationaleState(
+                        onRequestPermission = {},
+                        permanentlyDenied = true,
+                        onOpenSettings = {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            context.startActivity(intent)
                         }
-                        context.startActivity(intent)
-                    }
-                )
-                uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
-                uiState.isLoading && uiState.allFolders.isEmpty() -> LoadingState()
-                uiState.permission == PermissionUiState.GRANTED && uiState.allFolders.isEmpty() -> EmptyLibraryState(onRefresh = viewModel::refresh)
-                else -> LibraryContent(
-                    uiState = uiState,
-                    viewMode = effectiveViewMode,
-                    onSearchQueryChange = viewModel::onSearchQueryChange,
-                    onOpenFolder = onOpenFolder,
-                    onOpenVideo = onOpenVideo
-                )
+                    )
+                    uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
+                    uiState.isLoading && uiState.allFolders.isEmpty() -> LoadingState()
+                    uiState.permission == PermissionUiState.GRANTED && uiState.allFolders.isEmpty() -> EmptyLibraryState(onRefresh = viewModel::refresh)
+                    else -> LibraryContent(
+                        uiState = uiState,
+                        viewMode = effectiveViewMode,
+                        onSearchQueryChange = viewModel::onSearchQueryChange,
+                        onOpenFolder = onOpenFolder,
+                        onOpenVideo = onOpenVideo
+                    )
+                }
             }
+
+            PteronBottomNavBar(
+                current = BottomNavDestination.LIBRARY,
+                onSelect = onNavigate,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 40.dp, vertical = 18.dp)
+            )
         }
     }
 }
@@ -165,7 +186,7 @@ private fun LibraryContent(
             value = uiState.searchQuery,
             onValueChange = onSearchQueryChange,
             placeholder = "Search folders...",
-            modifier = Modifier.padding(16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp)
         )
 
         if (uiState.searchQuery.isNotBlank() && filtered.isEmpty()) {
@@ -177,10 +198,10 @@ private fun LibraryContent(
             Text(
                 "Continue Watching",
                 style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
             )
             LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 items(uiState.continueWatching, key = { it.id }) { video ->
@@ -202,9 +223,9 @@ private fun LibraryContent(
         when (viewMode) {
             ViewMode.GRID -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BottomNavClearance),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filtered, key = { it.bucketId }) { folder ->
@@ -217,8 +238,8 @@ private fun LibraryContent(
                 }
             }
             ViewMode.LIST -> androidx.compose.foundation.lazy.LazyColumn(
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BottomNavClearance),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filtered, key = { it.bucketId }) { folder ->

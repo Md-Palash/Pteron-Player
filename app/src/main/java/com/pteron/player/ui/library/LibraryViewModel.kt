@@ -115,6 +115,10 @@ class LibraryViewModel(
         _uiState.value = _uiState.value.copy(searchQuery = query)
     }
 
+    fun toggleDarkMode() {
+        viewModelScope.launch { appearancePrefsRepository.toggleDarkMode() }
+    }
+
     class Factory(
         private val mediaStoreRepository: MediaStoreRepository,
         private val playbackStateRepository: PlaybackStateRepository,
