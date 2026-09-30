@@ -39,7 +39,7 @@ fun SearchCard(
     placeholder: String,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(20.dp)
+    val shape = RoundedCornerShape(percent = 50)
     val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
     val borderColor by animateColorAsState(
@@ -54,7 +54,7 @@ fun SearchCard(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
-            .fillMaxWidth()
+            .fillMaxWidth(0.9f)
             .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
             .onFocusChanged { focused = it.isFocused },
         placeholder = { Text(placeholder) },
