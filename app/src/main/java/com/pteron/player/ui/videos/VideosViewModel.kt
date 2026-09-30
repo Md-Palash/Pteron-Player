@@ -130,6 +130,10 @@ class VideosViewModel(
         viewModelScope.launch { playbackStateRepository.clearPosition(video.id) }
     }
 
+    fun toggleDarkMode() {
+        viewModelScope.launch { appearancePrefsRepository.toggleDarkMode() }
+    }
+
     class Factory(
         private val mediaStoreRepository: MediaStoreRepository,
         private val playbackStateRepository: PlaybackStateRepository,
