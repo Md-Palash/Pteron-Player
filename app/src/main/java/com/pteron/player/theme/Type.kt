@@ -1,91 +1,51 @@
 package com.pteron.player.theme
 
 import androidx.compose.material3.Typography
-import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.sp
+import com.pteron.player.R
 
-// The Stitch design uses Plus Jakarta Sans for headlines/display and Inter
-// for body/label text. Both are close enough in metrics to the system
-// default that we use the platform sans-serif family rather than bundling
-// font files, keeping the app lightweight; swap these FontFamily values for
-// bundled fonts later if pixel-perfect typography is required.
-private val HeadlineFamily = FontFamily.SansSerif
-private val BodyFamily = FontFamily.SansSerif
+/**
+ * Comfortaa, used for every piece of text in the app.
+ *
+ * IMPORTANT: this references font files that are not bundled by default -- add them yourself
+ * before this will compile:
+ *   1. Download the static weights from https://fonts.google.com/specimen/Comfortaa (the "Get
+ *      font" > "Download all" button includes Comfortaa-Light/Regular/Medium/SemiBold/Bold.ttf).
+ *   2. Rename them to lowercase snake_case and copy them into app/src/main/res/font/:
+ *        comfortaa_light.ttf, comfortaa_regular.ttf, comfortaa_medium.ttf,
+ *        comfortaa_semibold.ttf, comfortaa_bold.ttf
+ *   3. That's it -- R.font.comfortaa_* will resolve once the files are in place.
+ *
+ * Font files are kept as local resources rather than Google's downloadable-fonts API on purpose:
+ * this app requests no INTERNET permission and is fully offline (see AndroidManifest.xml), and
+ * the downloadable-fonts API would need one just to fetch the typeface on first use.
+ */
+private val ComfortaaFamily = FontFamily(
+    Font(R.font.comfortaa_light, FontWeight.Light),
+    Font(R.font.comfortaa_regular, FontWeight.Normal),
+    Font(R.font.comfortaa_medium, FontWeight.Medium),
+    Font(R.font.comfortaa_semibold, FontWeight.SemiBold),
+    Font(R.font.comfortaa_bold, FontWeight.Bold)
+)
+
+private val defaultType = Typography()
 
 val PteronTypography = Typography(
-    displayLarge = TextStyle(
-        fontFamily = HeadlineFamily,
-        fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.02).sp
-    ),
-    headlineLarge = TextStyle(
-        fontFamily = HeadlineFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp,
-        lineHeight = 34.sp
-    ),
-    headlineMedium = TextStyle(
-        fontFamily = HeadlineFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 20.sp,
-        lineHeight = 28.sp
-    ),
-    headlineSmall = TextStyle(
-        fontFamily = HeadlineFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 18.sp,
-        lineHeight = 24.sp
-    ),
-    titleMedium = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp,
-        lineHeight = 22.sp
-    ),
-    titleSmall = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    bodyLarge = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 16.sp,
-        lineHeight = 24.sp
-    ),
-    bodyMedium = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 14.sp,
-        lineHeight = 20.sp
-    ),
-    bodySmall = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 12.sp,
-        lineHeight = 16.sp
-    ),
-    labelLarge = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 13.sp,
-        lineHeight = 18.sp
-    ),
-    labelMedium = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
-        lineHeight = 16.sp
-    ),
-    labelSmall = TextStyle(
-        fontFamily = BodyFamily,
-        fontWeight = FontWeight.SemiBold,
-        fontSize = 10.sp,
-        lineHeight = 14.sp
-    )
+    displayLarge = defaultType.displayLarge.copy(fontFamily = ComfortaaFamily),
+    displayMedium = defaultType.displayMedium.copy(fontFamily = ComfortaaFamily),
+    displaySmall = defaultType.displaySmall.copy(fontFamily = ComfortaaFamily),
+    headlineLarge = defaultType.headlineLarge.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.SemiBold),
+    headlineMedium = defaultType.headlineMedium.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.SemiBold),
+    headlineSmall = defaultType.headlineSmall.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.SemiBold),
+    titleLarge = defaultType.titleLarge.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.SemiBold),
+    titleMedium = defaultType.titleMedium.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.Medium),
+    titleSmall = defaultType.titleSmall.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.Medium),
+    bodyLarge = defaultType.bodyLarge.copy(fontFamily = ComfortaaFamily),
+    bodyMedium = defaultType.bodyMedium.copy(fontFamily = ComfortaaFamily),
+    bodySmall = defaultType.bodySmall.copy(fontFamily = ComfortaaFamily),
+    labelLarge = defaultType.labelLarge.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.Medium),
+    labelMedium = defaultType.labelMedium.copy(fontFamily = ComfortaaFamily, fontWeight = FontWeight.Medium),
+    labelSmall = defaultType.labelSmall.copy(fontFamily = ComfortaaFamily)
 )
