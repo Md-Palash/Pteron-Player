@@ -53,6 +53,8 @@ class SettingsViewModel(
 
     fun clearWatchHistory() = viewModelScope.launch { playbackStateRepository.clearAll() }
 
+    fun toggleDarkMode() = viewModelScope.launch { appearanceRepository.toggleDarkMode() }
+
     class Factory(
         private val appearanceRepository: AppearancePrefsRepository,
         private val playbackPrefsRepository: PlaybackPrefsRepository,

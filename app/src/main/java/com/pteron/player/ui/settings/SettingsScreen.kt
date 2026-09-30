@@ -37,6 +37,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.GraphicEq
@@ -52,14 +53,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,6 +88,7 @@ import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.theme.colors
 import com.pteron.player.theme.readableOn
+import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
@@ -134,56 +134,72 @@ fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestinati
 
     BackHandler(enabled = openSection != null) { openSectionName = null }
 
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                navigationIcon = {
-                    AnimatedVisibility(
-                        visible = openSection != null,
-                        enter = fadeIn() + expandHorizontally(),
-                        exit = fadeOut() + shrinkHorizontally()
-                    ) {
-                        IconButton(onClick = { openSectionName = null }) {
-                            Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to settings")
+    Scaffold { insets ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(insets)
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        AnimatedVisibility(
+                            visible = openSection != null,
+                            enter = fadeIn() + expandHorizontally(),
+                            exit = fadeOut() + shrinkHorizontally()
+                        ) {
+                            Box(modifier = Modifier.padding(end = 8.dp).bouncyClickable(onClick = { openSectionName = null })) {
+                                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back to settings")
+                            }
+                        }
+                        AnimatedContent(
+                            targetState = openSection,
+                            transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                            label = "settingsTitle"
+                        ) { section ->
+                            TwoLineTitle(
+                                subtitle = if (section == null) "PTERON PLAYER" else "SETTINGS",
+                                title = section?.title ?: "Settings"
+                            )
                         }
                     }
-                },
-                title = {
-                    AnimatedContent(
-                        targetState = openSection,
-                        transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
-                        label = "settingsTitle"
-                    ) { section ->
-                        TwoLineTitle(
-                            subtitle = if (section == null) "PTERON PLAYER" else "SETTINGS",
-                            title = section?.title ?: "Settings"
-                        )
+                    CircularActionButton(
+                        icon = Icons.Outlined.DarkMode,
+                        contentDescription = "Toggle dark mode",
+                        onClick = viewModel::toggleDarkMode
+                    )
+                }
+
+                // Only the layer being shown is composed, so an unopened section costs nothing.
+                AnimatedContent(
+                    modifier = Modifier.weight(1f),
+                    targetState = openSection,
+                    transitionSpec = { settingsTransition(opening = targetState != null) },
+                    label = "settingsLayer"
+                ) { section ->
+                    if (section == null) {
+                        SettingsHome(onOpen = { openSectionName = it.name })
+                    } else {
+                        SettingsSectionContent(section, appearance, playbackPrefs, viewModel)
                     }
                 }
-            )
-        },
-        bottomBar = {
+            }
+
             PteronBottomNavBar(
                 current = BottomNavDestination.SETTINGS,
                 // Tapping the tab you're already on steps back out to the header list.
                 onSelect = { destination ->
                     if (destination == BottomNavDestination.SETTINGS) openSectionName = null else onNavigate(destination)
-                }
+                },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 40.dp, vertical = 18.dp)
             )
-        }
-    ) { padding ->
-        // Only the layer being shown is composed, so an unopened section costs nothing.
-        AnimatedContent(
-            targetState = openSection,
-            modifier = Modifier.fillMaxSize().padding(padding),
-            transitionSpec = { settingsTransition(opening = targetState != null) },
-            label = "settingsLayer"
-        ) { section ->
-            if (section == null) {
-                SettingsHome(onOpen = { openSectionName = it.name })
-            } else {
-                SettingsSectionContent(section, appearance, playbackPrefs, viewModel)
-            }
         }
     }
 }
@@ -191,12 +207,12 @@ fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestinati
 // --- Layer 1: header cards ------------------------------------------------------------------
 
 @Composable
-private fun SettingsPage(spacing: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) {
+private fun SettingsPage(spacing: Dp = 8.dp, content: @Composable ColumnScope.() -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(horizontal = 26.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(spacing),
         content = content
     )
@@ -204,15 +220,15 @@ private fun SettingsPage(spacing: Dp = 16.dp, content: @Composable ColumnScope.(
 
 @Composable
 private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
-    SettingsPage(spacing = 12.dp) {
+    SettingsPage(spacing = 4.dp) {
         SettingsSection.entries.forEach { section ->
             SectionHeaderCard(section = section, onClick = { onOpen(section) })
         }
     }
 }
 
-/** A card in the theme's medium shade, corners rounded more than the video/library cards --
- *  every detail card inside a Settings section goes through here. */
+/** A card in the theme's medium shade, its left and right sides fully rounded -- every detail
+ *  card inside a Settings section goes through here. */
 @Composable
 private fun SettingsCard(
     modifier: Modifier = Modifier,
@@ -220,7 +236,7 @@ private fun SettingsCard(
 ) {
     Card(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
         content = content
     )
@@ -228,7 +244,7 @@ private fun SettingsCard(
 
 @Composable
 private fun SectionHeaderCard(section: SettingsSection, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(24.dp)
+    val shape = RoundedCornerShape(percent = 50)
     Card(
         // clip() sits outside bouncyClickable so the press ripple follows the rounded corners.
         modifier = Modifier
@@ -331,10 +347,10 @@ private fun LabeledGroup(label: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun ThemeGrid(themes: List<AppTheme>, selected: AppTheme, onSelect: (AppTheme) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        themes.chunked(2).forEach { pair ->
-            Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                pair.forEach { theme ->
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        themes.chunked(3).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { theme ->
                     ThemePreviewCard(
                         theme = theme,
                         selected = theme == selected,
@@ -342,7 +358,7 @@ private fun ThemeGrid(themes: List<AppTheme>, selected: AppTheme, onSelect: (App
                         modifier = Modifier.weight(1f)
                     )
                 }
-                if (pair.size == 1) Spacer(Modifier.weight(1f))
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -361,12 +377,12 @@ private fun ThemePreviewCard(
     modifier: Modifier = Modifier
 ) {
     val colors = remember(theme) { theme.colors() }
-    val shape = RoundedCornerShape(20.dp)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val shape = RoundedCornerShape(14.dp)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1.4f)
+                .aspectRatio(1.05f)
                 .border(
                     width = if (selected) 2.5.dp else 1.dp,
                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
@@ -399,8 +415,8 @@ private fun ThemePreviewCard(
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(top = 8.dp, end = 8.dp)
-                        .size(22.dp)
+                        .padding(top = 4.dp, end = 4.dp)
+                        .size(16.dp)
                         .clip(CircleShape)
                         .background(colors.accent),
                     contentAlignment = Alignment.Center
@@ -409,15 +425,17 @@ private fun ThemePreviewCard(
                         Icons.Filled.Check,
                         contentDescription = null,
                         tint = readableOn(colors.accent),
-                        modifier = Modifier.size(14.dp)
+                        modifier = Modifier.size(10.dp)
                     )
                 }
             }
         }
         Text(
             theme.displayName,
-            style = MaterialTheme.typography.labelLarge,
-            modifier = Modifier.padding(start = 4.dp)
+            style = MaterialTheme.typography.labelSmall,
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 2.dp)
         )
     }
 }
