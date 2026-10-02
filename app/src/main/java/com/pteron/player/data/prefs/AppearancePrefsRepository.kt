@@ -25,7 +25,12 @@ data class AppearanceState(
     val viewMode: ViewMode = ViewMode.GRID,
     val sortOption: SortOption = SortOption.DATE_ADDED,
     val sortDirection: SortDirection = SortDirection.DESCENDING,
-    val defaultPlaybackSpeed: Float = 1.0f
+    val defaultPlaybackSpeed: Float = 1.0f,
+    /** Shade adjustments, -1 (lighter) .. +1 (darker); 0 keeps the theme's own shade. */
+    val canvasShade: Float = 0f,
+    val cardShade: Float = 0f,
+    val folderShade: Float = 0f,
+    val font: AppFont = AppFont.DEFAULT
 )
 
 /**
@@ -45,21 +50,47 @@ class AppearancePrefsRepository(private val context: Context) {
         val DEFAULT_SPEED = floatPreferencesKey("default_playback_speed")
         val LAST_LIGHT_THEME = stringPreferencesKey("last_light_theme")
         val LAST_DARK_THEME = stringPreferencesKey("last_dark_theme")
+        val CANVAS_SHADE = floatPreferencesKey("canvas_shade")
+        val CARD_SHADE = floatPreferencesKey("card_shade")
+        val FOLDER_SHADE = floatPreferencesKey("folder_shade")
+        val APP_FONT = stringPreferencesKey("app_font")
     }
 
     // DataStore can only be read asynchronously, which would mean a first frame in the wrong
     // theme (a light flash for dark-theme users). This tiny file remembers the last theme so it
-    // can be read synchronously at startup; it is kept in sync by [theme] below.
+    // can be read synchronously at startup (theme, shades and font); it is kept in sync by [theme] below.
     private val themeCache by lazy { context.getSharedPreferences("theme_cache", Context.MODE_PRIVATE) }
 
-    /** The last applied theme, available instantly. Only meant for the very first frame. */
-    fun cachedTheme(): AppTheme = AppTheme.fromName(themeCache.getString("theme", null))
+    /** The last applied look, available instantly. Only meant for the very first frame. */
+    fun cachedThemeSettings(): ThemeSettings = ThemeSettings(
+        theme = AppTheme.fromName(themeCache.getString("theme", null)),
+        canvasShade = themeCache.getFloat("canvas", 0f),
+        cardShade = themeCache.getFloat("card", 0f),
+        folderShade = themeCache.getFloat("folder", 0f),
+        font = AppFont.fromName(themeCache.getString("font", null))
+    )
 
-    /** Just the theme: emits only when it really changes, so the app theme isn't rebuilt for every other setting. */
-    val theme: Flow<AppTheme> = context.appearanceDataStore.data
-        .map { prefs -> AppTheme.fromName(prefs[Keys.APP_THEME]) }
+    /** Just the look (theme, shades, font): emits only when it really changes, so the app theme isn't rebuilt for every other setting. */
+    val theme: Flow<ThemeSettings> = context.appearanceDataStore.data
+        .map { prefs ->
+            ThemeSettings(
+                theme = AppTheme.fromName(prefs[Keys.APP_THEME]),
+                canvasShade = prefs[Keys.CANVAS_SHADE] ?: 0f,
+                cardShade = prefs[Keys.CARD_SHADE] ?: 0f,
+                folderShade = prefs[Keys.FOLDER_SHADE] ?: 0f,
+                font = AppFont.fromName(prefs[Keys.APP_FONT])
+            )
+        }
         .distinctUntilChanged()
-        .onEach { themeCache.edit().putString("theme", it.name).apply() }
+        .onEach {
+            themeCache.edit()
+                .putString("theme", it.theme.name)
+                .putFloat("canvas", it.canvasShade)
+                .putFloat("card", it.cardShade)
+                .putFloat("folder", it.folderShade)
+                .putString("font", it.font.name)
+                .apply()
+        }
 
     val state: Flow<AppearanceState> = context.appearanceDataStore.data.map { prefs ->
         AppearanceState(
@@ -74,7 +105,11 @@ class AppearancePrefsRepository(private val context: Context) {
             sortDirection = runCatching {
                 SortDirection.valueOf(prefs[Keys.SORT_DIRECTION] ?: SortDirection.DESCENDING.name)
             }.getOrDefault(SortDirection.DESCENDING),
-            defaultPlaybackSpeed = prefs[Keys.DEFAULT_SPEED] ?: 1.0f
+            defaultPlaybackSpeed = prefs[Keys.DEFAULT_SPEED] ?: 1.0f,
+            canvasShade = prefs[Keys.CANVAS_SHADE] ?: 0f,
+            cardShade = prefs[Keys.CARD_SHADE] ?: 0f,
+            folderShade = prefs[Keys.FOLDER_SHADE] ?: 0f,
+            font = AppFont.fromName(prefs[Keys.APP_FONT])
         )
     }
 
@@ -93,6 +128,15 @@ class AppearancePrefsRepository(private val context: Context) {
         val lastDark = prefs[Keys.LAST_DARK_THEME]?.let { AppTheme.fromName(it) } ?: AppTheme.ESPRESSO
         setTheme(if (current.isDark) lastLight else lastDark)
     }
+    suspend fun setCanvasShade(value: Float) = edit { it[Keys.CANVAS_SHADE] = value.coerceIn(-1f, 1f) }
+    suspend fun setCardShade(value: Float) = edit { it[Keys.CARD_SHADE] = value.coerceIn(-1f, 1f) }
+    suspend fun setFolderShade(value: Float) = edit { it[Keys.FOLDER_SHADE] = value.coerceIn(-1f, 1f) }
+    suspend fun resetShades() = edit {
+        it.remove(Keys.CANVAS_SHADE)
+        it.remove(Keys.CARD_SHADE)
+        it.remove(Keys.FOLDER_SHADE)
+    }
+    suspend fun setFont(font: AppFont) = edit { it[Keys.APP_FONT] = font.name }
     suspend fun setShowVideoCountBadge(value: Boolean) = edit { it[Keys.SHOW_VIDEO_COUNT] = value }
     suspend fun setShowFolderSizeBadge(value: Boolean) = edit { it[Keys.SHOW_FOLDER_SIZE] = value }
     suspend fun setGestureSensitivity(value: Float) = edit { it[Keys.GESTURE_SENSITIVITY] = value.coerceIn(0.5f, 2.0f) }

@@ -46,3 +46,35 @@ enum class AppTheme(
         fun fromName(name: String?): AppTheme = entries.firstOrNull { it.name == name } ?: DEFAULT
     }
 }
+
+/**
+ * Fonts the person can choose from in Settings. Only [COMFORTAA] is a bundled file; the rest use
+ * Android's built-in font families, so adding them costs nothing in APK size and needs no
+ * INTERNET permission. To offer another bundled font, add an entry here and map it in
+ * `AppFont.fontFamily()` (theme/Type.kt).
+ */
+enum class AppFont(val displayName: String) {
+    COMFORTAA("Comfortaa"),
+    SYSTEM("System default"),
+    SERIF("Serif"),
+    MONOSPACE("Monospace"),
+    CURSIVE("Cursive");
+
+    companion object {
+        val DEFAULT = COMFORTAA
+
+        fun fromName(name: String?): AppFont = entries.firstOrNull { it.name == name } ?: DEFAULT
+    }
+}
+
+/**
+ * Everything that decides how the app is painted: the chosen theme, the person's three shade
+ * adjustments (each -1 = lighter .. +1 = darker, 0 = the theme's own shade) and the font.
+ */
+data class ThemeSettings(
+    val theme: AppTheme = AppTheme.DEFAULT,
+    val canvasShade: Float = 0f,
+    val cardShade: Float = 0f,
+    val folderShade: Float = 0f,
+    val font: AppFont = AppFont.DEFAULT
+)
