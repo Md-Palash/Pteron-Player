@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.CircularActionButton
+import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.FullScreenMessage
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.TwoLineTitle
@@ -48,11 +49,7 @@ fun PlaylistsScreen(onNavigate: (BottomNavDestination) -> Unit, onToggleDarkMode
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TwoLineTitle(subtitle = "PTERON PLAYER", title = "Playlists")
-                    CircularActionButton(
-                        icon = Icons.Outlined.DarkMode,
-                        contentDescription = "Toggle dark mode",
-                        onClick = onToggleDarkMode
-                    )
+                    DarkModeButton(onClick = onToggleDarkMode)
                 }
                 FullScreenMessage(
                     icon = Icons.Outlined.PlaylistPlay,
