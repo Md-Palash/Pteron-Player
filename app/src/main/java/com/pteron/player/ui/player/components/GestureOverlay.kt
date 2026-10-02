@@ -10,30 +10,41 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import kotlin.math.max
+import kotlin.math.roundToInt
 
 enum class SeekFlashSide { NONE, LEFT, RIGHT }
+
+/** What a drag turned out to be. Decided once, a few dp into the drag, and then kept. */
+private enum class DragAxis { UNDECIDED, HORIZONTAL, VERTICAL, IGNORED }
 
 /**
  * Transparent gesture-capture layer placed above the video surface and below
  * the visible controls. Handles:
- *  - single tap: toggles control visibility
+ *  - single tap: toggles control visibility (also while locked, so the unlock button can be shown)
  *  - double tap left/right third: seek back/forward by the configured step, with a brief flash
+ *  - double tap middle third: play / pause
  *  - vertical drag on the left half: screen brightness (reported via [onBrightnessChanged] for a HUD)
  *  - vertical drag on the right half: media volume (reported via [onVolumeChanged] for a HUD)
  *  - horizontal drag: scrub preview, committed on release
+ *
+ * A drag is classified as horizontal or vertical once, near its start, and then stays that way,
+ * so a slightly wobbly volume swipe can never turn into a scrub (and the other way round). Drags
+ * that start within a thumb's width of the left/right edge are ignored so they never fight the
+ * system back gesture. The handlers read the live values through [rememberUpdatedState], so the
+ * once-per-second position tick never restarts (and so never interrupts) a drag in progress.
  *
  * All drag magnitudes are scaled by [sensitivity] (0.5x precise .. 2.0x fast),
  * persisted from Settings.
@@ -45,8 +56,10 @@ fun GestureOverlay(
     sensitivity: Float,
     seekStepMs: Long,
     durationMs: Long,
-    currentPositionMs: Long,
+    /** Read only when a scrub starts, so the caller doesn't have to recompose every second. */
+    positionProvider: () -> Long,
     onToggleControls: () -> Unit,
+    onTogglePlayPause: () -> Unit,
     onSeekBy: (Long) -> Unit,
     onScrubPreview: (Long?) -> Unit,
     onScrubCommit: (Long) -> Unit,
@@ -58,97 +71,150 @@ fun GestureOverlay(
     val activity = context as? Activity
     val audioManager = remember { context.getSystemService(AudioManager::class.java) }
     val scope = rememberCoroutineScope()
+    val flashJob = remember { arrayOfNulls<Job>(1) }
 
-    var containerSize by remember { mutableStateOf(IntSize.Zero) }
-    var scrubTargetMs by remember { mutableFloatStateOf(0f) }
-    var isScrubbing by remember { mutableStateOf(false) }
-    var dragStartedOnLeftHalf by remember { mutableStateOf(true) }
-
-    // Anchored at the start of each vertical drag so brightness/volume track the finger by a pure
-    // offset from where it began, rather than being recomputed from a system read on every pointer
-    // move. That avoids two sources of jumpiness: a stale/-1 "use system default" brightness value
-    // snapping to an arbitrary baseline, and a read-modify-write round trip drifting at the edges.
-    var brightnessAnchor by remember { mutableFloatStateOf(0.5f) }
-    var volumeIndexAnchor by remember { mutableIntStateOf(0) }
-    var volumeMaxAnchor by remember { mutableIntStateOf(1) }
+    val sensitivityNow by rememberUpdatedState(sensitivity)
+    val seekStepNow by rememberUpdatedState(seekStepMs)
+    val durationNow by rememberUpdatedState(durationMs)
+    val positionNow by rememberUpdatedState(positionProvider)
+    val toggleControls by rememberUpdatedState(onToggleControls)
+    val togglePlayPause by rememberUpdatedState(onTogglePlayPause)
+    val seekBy by rememberUpdatedState(onSeekBy)
+    val scrubPreview by rememberUpdatedState(onScrubPreview)
+    val scrubCommit by rememberUpdatedState(onScrubCommit)
+    val flash by rememberUpdatedState(onFlash)
+    val brightnessChanged by rememberUpdatedState(onBrightnessChanged)
+    val volumeChanged by rememberUpdatedState(onVolumeChanged)
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .pointerInput(locked) {
-                if (locked) return@pointerInput
-                containerSize = size
-                detectTapGestures(
-                    onTap = { onToggleControls() },
-                    onDoubleTap = { offset ->
-                        val third = size.width / 3f
-                        when {
-                            offset.x < third -> {
-                                onSeekBy(-seekStepMs)
-                                onFlash(SeekFlashSide.LEFT)
-                            }
-                            offset.x > third * 2 -> {
-                                onSeekBy(seekStepMs)
-                                onFlash(SeekFlashSide.RIGHT)
-                            }
-                        }
-                        scope.launch {
+                val onDoubleTapHandler: (Offset) -> Unit = { offset ->
+                    val third = size.width / 3f
+                    val side = when {
+                        offset.x < third -> SeekFlashSide.LEFT
+                        offset.x > third * 2 -> SeekFlashSide.RIGHT
+                        else -> SeekFlashSide.NONE
+                    }
+                    when (side) {
+                        SeekFlashSide.LEFT -> seekBy(-seekStepNow)
+                        SeekFlashSide.RIGHT -> seekBy(seekStepNow)
+                        SeekFlashSide.NONE -> togglePlayPause()
+                    }
+                    if (side != SeekFlashSide.NONE) {
+                        flash(side)
+                        // A new double tap restarts the hide timer instead of the old one cutting it short.
+                        flashJob[0]?.cancel()
+                        flashJob[0] = scope.launch {
                             delay(450)
-                            onFlash(SeekFlashSide.NONE)
+                            flash(SeekFlashSide.NONE)
                         }
                     }
+                }
+                // While locked there is no double tap, so a single tap is reported immediately
+                // (no wait for a possible second tap) to show the unlock button.
+                detectTapGestures(
+                    onTap = { toggleControls() },
+                    onDoubleTap = if (locked) null else onDoubleTapHandler
                 )
             }
-            .pointerInput(locked, sensitivity, durationMs, currentPositionMs) {
+            .pointerInput(locked) {
                 if (locked) return@pointerInput
-                containerSize = size
+
+                val edgeGuardPx = 24.dp.toPx()
+                val decideDistancePx = 6.dp.toPx()
+
+                var axis = DragAxis.IGNORED
+                var totalX = 0f
+                var totalY = 0f
+                var scrubbing = false
+                var scrubTargetMs = 0f
+                var startedOnLeftHalf = true
+                var brightness = 0.5f
+                var volumePosition = 0f
+                var volumeIndex = 0
+                var volumeMax = 1
+
+                fun scrub(dx: Float) {
+                    val duration = durationNow
+                    if (duration <= 0L) return
+                    scrubbing = true
+                    // A full-width drag covers roughly 2 minutes of footage at 1.0x sensitivity.
+                    val msPerPx = (120_000f / size.width.coerceAtLeast(1)) * sensitivityNow
+                    scrubTargetMs = (scrubTargetMs + dx * msPerPx).coerceIn(0f, duration.toFloat())
+                    scrubPreview(scrubTargetMs.toLong())
+                }
+
+                fun vertical(dy: Float) {
+                    val fraction = (dy / size.height.coerceAtLeast(1)) * sensitivityNow
+                    if (startedOnLeftHalf) {
+                        brightness = (brightness - fraction).coerceIn(0.02f, 1f)
+                        applyWindowBrightness(activity, brightness)
+                        brightnessChanged(brightness)
+                    } else {
+                        // Kept as a float so a slow swipe accumulates instead of rounding away.
+                        volumePosition = (volumePosition - fraction * volumeMax).coerceIn(0f, volumeMax.toFloat())
+                        val target = volumePosition.roundToInt()
+                        if (target != volumeIndex) {
+                            volumeIndex = target
+                            runCatching { audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0) }
+                        }
+                        volumeChanged(target.toFloat() / volumeMax.toFloat(), target, volumeMax)
+                    }
+                }
+
                 detectDragGestures(
                     onDragStart = { offset ->
-                        scrubTargetMs = currentPositionMs.toFloat()
-                        dragStartedOnLeftHalf = offset.x < containerSize.width / 2f
-                        isScrubbing = false
-                        brightnessAnchor = currentWindowBrightness(activity, context)
-                        volumeIndexAnchor = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
-                        volumeMaxAnchor = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 1).coerceAtLeast(1)
+                        totalX = 0f
+                        totalY = 0f
+                        scrubbing = false
+                        scrubTargetMs = positionNow().toFloat()
+                        startedOnLeftHalf = offset.x < size.width / 2f
+                        axis = if (offset.x < edgeGuardPx || offset.x > size.width - edgeGuardPx) {
+                            DragAxis.IGNORED
+                        } else {
+                            DragAxis.UNDECIDED
+                        }
+                        if (axis != DragAxis.IGNORED) {
+                            brightness = currentWindowBrightness(activity, context)
+                            volumeMax = (audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC) ?: 1).coerceAtLeast(1)
+                            volumeIndex = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0
+                            volumePosition = volumeIndex.toFloat()
+                        }
                     },
                     onDragEnd = {
-                        if (isScrubbing) {
-                            onScrubCommit(scrubTargetMs.toLong())
-                            onScrubPreview(null)
+                        if (scrubbing) {
+                            scrubCommit(scrubTargetMs.toLong())
+                            scrubPreview(null)
                         }
-                        isScrubbing = false
+                        scrubbing = false
+                        axis = DragAxis.IGNORED
                     },
                     onDragCancel = {
-                        if (isScrubbing) onScrubPreview(null)
-                        isScrubbing = false
+                        if (scrubbing) scrubPreview(null)
+                        scrubbing = false
+                        axis = DragAxis.IGNORED
                     },
                     onDrag = { change, dragAmount ->
                         change.consume()
-                        val isHorizontalGesture = abs(dragAmount.x) > abs(dragAmount.y) * 1.3f
-                        if (isHorizontalGesture && durationMs > 0) {
-                            isScrubbing = true
-                            val widthPx = containerSize.width.takeIf { it > 0 } ?: 1
-                            // Full-width drag covers roughly 2 minutes of footage at 1.0x sensitivity.
-                            val msPerPx = (120_000f / widthPx) * sensitivity
-                            val deltaMs = dragAmount.x * msPerPx
-                            scrubTargetMs = (scrubTargetMs + deltaMs).coerceIn(0f, durationMs.toFloat())
-                            onScrubPreview(scrubTargetMs.toLong())
-                        } else if (!isHorizontalGesture) {
-                            val heightPx = containerSize.height.takeIf { it > 0 } ?: 1
-                            val fraction = (dragAmount.y / heightPx) * sensitivity
-                            if (dragStartedOnLeftHalf) {
-                                brightnessAnchor = (brightnessAnchor - fraction).coerceIn(0.02f, 1f)
-                                applyWindowBrightness(activity, brightnessAnchor)
-                                onBrightnessChanged(brightnessAnchor)
-                            } else {
-                                val deltaSteps = -fraction * volumeMaxAnchor
-                                val target = (volumeIndexAnchor + deltaSteps).toInt().coerceIn(0, volumeMaxAnchor)
-                                if (target != volumeIndexAnchor) {
-                                    volumeIndexAnchor = target
-                                    audioManager?.setStreamVolume(AudioManager.STREAM_MUSIC, target, 0)
+                        when (axis) {
+                            DragAxis.IGNORED -> Unit
+                            DragAxis.UNDECIDED -> {
+                                totalX += dragAmount.x
+                                totalY += dragAmount.y
+                                if (max(abs(totalX), abs(totalY)) >= decideDistancePx) {
+                                    if (abs(totalX) > abs(totalY)) {
+                                        axis = DragAxis.HORIZONTAL
+                                        scrub(totalX)
+                                    } else {
+                                        axis = DragAxis.VERTICAL
+                                        vertical(totalY)
+                                    }
                                 }
-                                onVolumeChanged(target.toFloat() / volumeMaxAnchor.toFloat(), target, volumeMaxAnchor)
                             }
+                            DragAxis.HORIZONTAL -> scrub(dragAmount.x)
+                            DragAxis.VERTICAL -> vertical(dragAmount.y)
                         }
                     }
                 )
