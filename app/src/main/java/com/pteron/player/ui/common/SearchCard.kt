@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,7 +30,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
 /**
- * A rounded search field styled as a card in the theme's medium shade. Its outline turns to the
+ * A rounded, centered-width search field styled as a card in the theme's medium shade. Its outline turns to the
  * accent (dark) shade while it has focus, and a clear button appears once there is text.
  */
 @Composable
@@ -54,7 +55,8 @@ fun SearchCard(
         value = value,
         onValueChange = onValueChange,
         modifier = modifier
-            .fillMaxWidth(0.9f)
+            .fillMaxWidth(0.78f)
+            .widthIn(max = 360.dp)
             .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
             .onFocusChanged { focused = it.isFocused },
         placeholder = { Text(placeholder) },

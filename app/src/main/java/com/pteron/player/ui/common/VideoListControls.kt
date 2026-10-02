@@ -66,15 +66,15 @@ fun VideoListHeader(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.padding(top = 8.dp, bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        modifier = modifier.padding(top = 4.dp, bottom = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         FilterCardsRow(active = activeFilter, onSelect = onFilterSelected)
         Text(
             text = if (videoCount == 1) "1 video" else "$videoCount videos",
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 20.dp)
         )
     }
 }
@@ -86,7 +86,7 @@ fun FilterCardsRow(active: VideoFilter, onSelect: (VideoFilter) -> Unit, modifie
     LazyRow(
         modifier = modifier,
         contentPadding = PaddingValues(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(VideoFilter.entries, key = { it.name }) { filter ->
             FilterCard(label = filter.label, selected = active == filter, onClick = { onSelect(filter) })
@@ -94,7 +94,7 @@ fun FilterCardsRow(active: VideoFilter, onSelect: (VideoFilter) -> Unit, modifie
     }
 }
 
-/** A rounded card: medium shade normally, dark (accent) shade when selected. */
+/** A narrow pill (tablet) card: medium shade normally, dark (accent) shade when selected. */
 @Composable
 private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
@@ -110,12 +110,12 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
     )
     PteronClickableCard(
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(percent = 50),
         color = container,
         borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AnimatedVisibility(
@@ -127,10 +127,10 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
                     Icons.Filled.Check,
                     contentDescription = null,
                     tint = content,
-                    modifier = Modifier.padding(end = 6.dp).size(16.dp)
+                    modifier = Modifier.padding(end = 4.dp).size(14.dp)
                 )
             }
-            Text(label, style = MaterialTheme.typography.labelLarge, color = content)
+            Text(label, style = MaterialTheme.typography.labelMedium, color = content)
         }
     }
 }
@@ -211,7 +211,7 @@ private fun SortMenu(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
             ) {
                 Column(
-                    modifier = Modifier.width(216.dp).padding(10.dp),
+                    modifier = Modifier.width(196.dp).padding(10.dp),
                     // Just a hairline between the cards, per feedback -- they used to have real
                     // breathing room (8dp) between them.
                     verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -242,12 +242,12 @@ private fun SortOptionCard(
     PteronClickableCard(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(percent = 50),
         color = if (selected) scheme.primary else scheme.surfaceContainer,
         borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {

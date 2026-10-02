@@ -1,10 +1,13 @@
 package com.pteron.player.ui.common
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -15,6 +18,8 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.Settings
@@ -24,26 +29,36 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.sp
+import com.pteron.player.theme.LocalThemeColors
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.pteron.player.navigation.BottomNavDestination
 
-/** The small caps app name over the larger screen title, matching the Stitch header pattern. */
+/**
+ * The header every screen starts with: a tiny small-caps line (app name or "SETTINGS") above the
+ * screen title. Fixed sizes, so every screen's header lines up the same way.
+ */
 @Composable
 fun TwoLineTitle(subtitle: String, title: String) {
     Column {
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.labelMedium,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.primary,
-            fontWeight = FontWeight.SemiBold
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 1.2.sp,
+            maxLines = 1
         )
         Text(
             text = title,
@@ -54,9 +69,51 @@ fun TwoLineTitle(subtitle: String, title: String) {
 }
 
 /**
- * A small round card holding one icon -- the "view toggle" / "dark mode" / "sort" buttons that
- * float in the top-right of every screen, on top of the plain background rather than inside
- * their own app-bar surface.
+ * A section heading inside a screen ("Continue Watching", "Folders (12)"), aligned to the same
+ * 16dp edge as the cards below it, with an optional [trailing] slot on the right.
+ */
+@Composable
+fun SectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = text, style = MaterialTheme.typography.titleMedium, maxLines = 1)
+        trailing?.invoke()
+    }
+}
+
+@Composable
+private fun CircularButtonShell(
+    contentDescription: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Box(
+        modifier = modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .semantics {
+                role = Role.Button
+                this.contentDescription = contentDescription
+            }
+            .bouncyClickable(onClick = onClick)
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+        contentAlignment = Alignment.Center,
+        content = { content() }
+    )
+}
+
+/**
+ * A small round card holding one icon -- the "view toggle" / "sort" buttons that float in the
+ * top-right of every screen, on top of the plain background rather than inside their own
+ * app-bar surface.
  */
 @Composable
 fun CircularActionButton(
@@ -65,21 +122,63 @@ fun CircularActionButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Box(
-        modifier = modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .semantics { role = Role.Button }
-            .bouncyClickable(onClick = onClick)
-            .background(MaterialTheme.colorScheme.surfaceContainer),
-        contentAlignment = Alignment.Center
-    ) {
+    CircularButtonShell(contentDescription, onClick, modifier) {
         Icon(
             imageVector = icon,
-            contentDescription = contentDescription,
+            contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.size(20.dp)
         )
+    }
+}
+
+/**
+ * The dark-mode button: a moon while the theme is light (tap to go dark), a sun while it is dark
+ * (tap to go light). The two icons cross-fade while turning and scaling, driven by one animated
+ * value, so the switch is a smooth swap rather than a cut.
+ */
+@Composable
+fun DarkModeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val isDark = LocalThemeColors.current.isDark
+    val progress by animateFloatAsState(
+        targetValue = if (isDark) 1f else 0f,
+        animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
+        label = "darkModeIcon"
+    )
+    val tint = MaterialTheme.colorScheme.onSurface
+    CircularButtonShell(
+        contentDescription = if (isDark) "Switch to light mode" else "Switch to dark mode",
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                imageVector = Icons.Outlined.DarkMode,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        alpha = 1f - progress
+                        rotationZ = -90f * progress
+                        scaleX = 1f - 0.5f * progress
+                        scaleY = 1f - 0.5f * progress
+                    }
+            )
+            Icon(
+                imageVector = Icons.Outlined.LightMode,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier
+                    .size(20.dp)
+                    .graphicsLayer {
+                        alpha = progress
+                        rotationZ = 90f * (1f - progress)
+                        scaleX = 0.5f + 0.5f * progress
+                        scaleY = 0.5f + 0.5f * progress
+                    }
+            )
+        }
     }
 }
 
