@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,18 +28,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.VideoFolder
-import com.pteron.player.ui.common.bouncyClickable
+import com.pteron.player.theme.LocalThemeColors
+import com.pteron.player.ui.common.PteronClickableCard
 import com.pteron.player.util.formatFileSize
 
 /**
  * Folder tile styled after the Stitch "tactile 2D folder" design: a solid card with a small
- * tab peeking out from behind the top edge, like a real manila folder. Folders use the theme's
- * dark (accent) shade; the tab and body share it exactly, so the illusion holds in every theme.
+ * tab peeking out from behind the top edge, like a real manila folder. The folder takes the
+ * theme's folder shade (the card color unless adjusted in Settings); the tab and body share it
+ * exactly, so the illusion holds in every theme. The folder icon sits in an accent bubble.
  */
 @Composable
 fun FolderCard(
@@ -48,8 +52,8 @@ fun FolderCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val folderColor = MaterialTheme.colorScheme.primary
-    val onFolder = MaterialTheme.colorScheme.onPrimary
+    val folderColor = LocalThemeColors.current.folder
+    val scheme = MaterialTheme.colorScheme
     Box(modifier = modifier.aspectRatio(1.65f)) {
         // Folder tab, peeking out above the card's top-left corner.
         Box(
@@ -62,70 +66,72 @@ fun FolderCard(
                 .background(folderColor)
         )
 
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1.65f)
-                .clip(RoundedCornerShape(12.dp))
-                .background(folderColor)
-                .bouncyClickable(onClick = onClick)
-                .padding(11.dp),
-            verticalArrangement = Arrangement.SpaceBetween
+        PteronClickableCard(
+            onClick = onClick,
+            modifier = Modifier.fillMaxWidth().aspectRatio(1.65f),
+            shape = RoundedCornerShape(12.dp),
+            color = folderColor,
+            borderColor = Color.Transparent
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top
+            Column(
+                modifier = Modifier.fillMaxSize().padding(11.dp),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(30.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(MaterialTheme.colorScheme.surfaceContainer),
-                    contentAlignment = Alignment.Center
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Icon(
-                        imageVector = folderIconFor(folder.name),
-                        contentDescription = null,
-                        tint = folderColor,
-                        modifier = Modifier.size(19.dp)
-                    )
-                }
-                if (showVideoCount) {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(onFolder.copy(alpha = 0.18f))
-                            .padding(horizontal = 8.dp, vertical = 3.dp)
+                            .size(30.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(scheme.primary),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "${folder.videoCount} items",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = onFolder
+                        Icon(
+                            imageVector = folderIconFor(folder.name),
+                            contentDescription = null,
+                            tint = scheme.onPrimary,
+                            modifier = Modifier.size(19.dp)
                         )
                     }
+                    if (showVideoCount) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(scheme.primary.copy(alpha = 0.14f))
+                                .padding(horizontal = 8.dp, vertical = 3.dp)
+                        ) {
+                            Text(
+                                text = "${folder.videoCount} items",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = scheme.primary
+                            )
+                        }
+                    }
                 }
-            }
 
-            Column {
-                Text(
-                    text = folder.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    color = onFolder,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val subtitle = buildString {
-                    append("${folder.videoCount} video${if (folder.videoCount == 1) "" else "s"}")
-                    if (showFolderSize) append(" • ${formatFileSize(folder.totalSizeBytes)}")
+                Column {
+                    Text(
+                        text = folder.name,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = scheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    val subtitle = buildString {
+                        append("${folder.videoCount} video${if (folder.videoCount == 1) "" else "s"}")
+                        if (showFolderSize) append(" • ${formatFileSize(folder.totalSizeBytes)}")
+                    }
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = onFolder.copy(alpha = 0.82f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }
@@ -139,49 +145,52 @@ fun FolderListRow(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .bouncyClickable(onClick = onClick)
-            .padding(12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    PteronClickableCard(
+        onClick = onClick,
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = LocalThemeColors.current.folder,
+        borderColor = Color.Transparent
     ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.primary),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(
-                imageVector = folderIconFor(folder.name),
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary
-            )
-        }
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = folder.name,
-                style = MaterialTheme.typography.titleSmall,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-            val subtitle = buildString {
-                if (showVideoCount) append("${folder.videoCount} videos")
-                if (showFolderSize) {
-                    if (isNotEmpty()) append(" • ")
-                    append(formatFileSize(folder.totalSizeBytes))
-                }
-            }
-            if (subtitle.isNotEmpty()) {
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = folderIconFor(folder.name),
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onPrimary
                 )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = folder.name,
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                val subtitle = buildString {
+                    if (showVideoCount) append("${folder.videoCount} videos")
+                    if (showFolderSize) {
+                        if (isNotEmpty()) append(" • ")
+                        append(formatFileSize(folder.totalSizeBytes))
+                    }
+                }
+                if (subtitle.isNotEmpty()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }
