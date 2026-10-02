@@ -46,6 +46,7 @@ import com.pteron.player.data.model.ViewMode
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.AppIcon
 import com.pteron.player.ui.common.CircularActionButton
+import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.EmptyLibraryState
 import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
@@ -53,6 +54,7 @@ import com.pteron.player.ui.common.NoSearchResultsState
 import com.pteron.player.ui.common.PermissionRationaleState
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.SearchCard
+import com.pteron.player.ui.common.SectionTitle
 import com.pteron.player.ui.common.videoLibraryPermission
 import com.pteron.player.ui.library.components.ContinueWatchingCard
 import com.pteron.player.ui.library.components.FolderCard
@@ -114,7 +116,7 @@ fun LibraryScreen(
                         Text(
                             "Pteron Player",
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.SemiBold
+                            maxLines = 1
                         )
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -123,11 +125,7 @@ fun LibraryScreen(
                             contentDescription = "Toggle grid or list view",
                             onClick = { viewModeOverride = if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID }
                         )
-                        CircularActionButton(
-                            icon = Icons.Outlined.DarkMode,
-                            contentDescription = "Toggle dark mode",
-                            onClick = viewModel::toggleDarkMode
-                        )
+                        DarkModeButton(onClick = viewModel::toggleDarkMode)
                     }
                 }
 
@@ -182,12 +180,14 @@ private fun LibraryContent(
     val filtered = uiState.filteredFolders
 
     Column(modifier = Modifier.fillMaxSize()) {
-        SearchCard(
-            value = uiState.searchQuery,
-            onValueChange = onSearchQueryChange,
-            placeholder = "Search folders...",
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        // Narrower than the screen and centered between the two edges.
+        Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+            SearchCard(
+                value = uiState.searchQuery,
+                onValueChange = onSearchQueryChange,
+                placeholder = "Search folders..."
+            )
+        }
 
         if (uiState.searchQuery.isNotBlank() && filtered.isEmpty()) {
             NoSearchResultsState()
@@ -195,11 +195,7 @@ private fun LibraryContent(
         }
 
         if (uiState.continueWatching.isNotEmpty() && uiState.searchQuery.isBlank()) {
-            Text(
-                "Continue Watching",
-                style = MaterialTheme.typography.headlineSmall,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-            )
+            SectionTitle("Continue Watching")
             LazyRow(
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 4.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -210,11 +206,7 @@ private fun LibraryContent(
             }
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text("Folders (${filtered.size})", style = MaterialTheme.typography.headlineSmall)
+        SectionTitle(text = "Folders (${filtered.size})") {
             if (uiState.isLoading) {
                 CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
             }
@@ -223,9 +215,9 @@ private fun LibraryContent(
         when (viewMode) {
             ViewMode.GRID -> LazyVerticalGrid(
                 columns = GridCells.Fixed(2),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = BottomNavClearance),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = BottomNavClearance),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(filtered, key = { it.bucketId }) { folder ->
