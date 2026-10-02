@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.ViewMode
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.CircularActionButton
+import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.EmptyLibraryState
 import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
@@ -82,11 +83,7 @@ fun VideosScreen(
                                 viewModel.onViewModeSelected(if (uiState.appearance.viewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID)
                             }
                         )
-                        CircularActionButton(
-                            icon = Icons.Outlined.DarkMode,
-                            contentDescription = "Toggle dark mode",
-                            onClick = viewModel::toggleDarkMode
-                        )
+                        DarkModeButton(onClick = viewModel::toggleDarkMode)
                     }
                 }
 
