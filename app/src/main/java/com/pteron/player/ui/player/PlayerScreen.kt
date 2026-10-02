@@ -8,11 +8,18 @@ import android.net.Uri
 import android.os.Build
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -25,12 +32,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.media3.ui.CaptionStyleCompat
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -123,20 +135,41 @@ fun PlayerScreen(
     var volumeMax by remember { mutableStateOf(1) }
     var showVolumeHud by remember { mutableStateOf(false) }
 
-    // Each HUD auto-hides ~900ms after the last change, restarting whenever the
-    // level changes again (LaunchedEffect keyed on the value itself does this for free).
-    LaunchedEffect(brightnessLevel) {
+    // Each HUD auto-hides ~900ms after the last gesture update. The effects are keyed on a
+    // counter that goes up on every update, not on the level itself: at the very top or bottom
+    // of the range the level stops changing, and a level-keyed effect would then never restart
+    // and leave the HUD stuck on screen.
+    var brightnessTick by remember { mutableIntStateOf(0) }
+    var volumeTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(brightnessTick) {
         if (showBrightnessHud) {
             delay(900)
             showBrightnessHud = false
         }
     }
-    LaunchedEffect(volumeFraction) {
+    LaunchedEffect(volumeTick) {
         if (showVolumeHud) {
             delay(900)
             showVolumeHud = false
         }
     }
+
+    // Bumped by every touch on the controls, so they never vanish under a finger that is still
+    // using them.
+    // A plain holder, not Compose state, so a stream of touch events never recomposes the screen.
+    val lastControlsTouchAt = remember { longArrayOf(0L) }
+    val touchBump: Modifier = Modifier.pointerInput(Unit) {
+        awaitPointerEventScope {
+            while (true) {
+                awaitPointerEvent(PointerEventPass.Initial)
+                lastControlsTouchAt[0] = android.os.SystemClock.uptimeMillis()
+            }
+        }
+    }
+    val scrubbingNow by rememberUpdatedState(scrubPreviewMs != null)
+
+    // While locked, system Back must not leave the player: it just shows the unlock button.
+    BackHandler(enabled = isLocked) { controlsVisible = true }
 
     LaunchedEffect(videoId, bucketId, externalUri, shuffle) {
         if (externalUri != null) {
@@ -189,6 +222,13 @@ fun PlayerScreen(
         }
         onDispose {
             controller?.show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            // The brightness gesture overrides the window's brightness; hand it back to the system
+            // setting so the rest of the app isn't left at whatever the last swipe chose.
+            window?.let {
+                val params = it.attributes
+                params.screenBrightness = android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                it.attributes = params
+            }
         }
     }
 
@@ -217,11 +257,21 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-hide controls after a few seconds of inactivity while playing and unlocked.
-    LaunchedEffect(controlsVisible, uiState.isPlaying, isLocked) {
-        if (controlsVisible && uiState.isPlaying && !isLocked) {
-            delay(uiState.playbackPrefs.controlAutoHideSeconds * 1000L)
-            controlsVisible = false
+    // Auto-hide controls after a few seconds of inactivity while playing. Also applies while
+    // locked, where the only control on screen is the unlock button. Any touch on the controls
+    // and any scrub in progress keep them up.
+    LaunchedEffect(controlsVisible, uiState.isPlaying) {
+        if (controlsVisible && uiState.isPlaying) {
+            val hideAfterMs = uiState.playbackPrefs.controlAutoHideSeconds * 1000L
+            val shownAt = android.os.SystemClock.uptimeMillis()
+            while (true) {
+                delay(250)
+                val lastActivity = maxOf(shownAt, lastControlsTouchAt[0])
+                if (!scrubbingNow && android.os.SystemClock.uptimeMillis() - lastActivity >= hideAfterMs) {
+                    controlsVisible = false
+                    break
+                }
+            }
         }
     }
 
@@ -257,6 +307,19 @@ fun PlayerScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
                     player = viewModel.player
+                    // No black flash between videos of the same queue.
+                    setKeepContentOnPlayerReset(true)
+                    // White text with a dark outline stays readable on any picture.
+                    subtitleView?.setStyle(
+                        CaptionStyleCompat(
+                            android.graphics.Color.WHITE,
+                            android.graphics.Color.TRANSPARENT,
+                            android.graphics.Color.TRANSPARENT,
+                            CaptionStyleCompat.EDGE_TYPE_OUTLINE,
+                            android.graphics.Color.BLACK,
+                            null
+                        )
+                    )
                 }
             },
             update = { playerView ->
@@ -281,33 +344,33 @@ fun PlayerScreen(
         )
 
         if (!isInPip) {
-            // The position changes every second; reading it inside WithProgress keeps that
-            // recomposition local to these two layers instead of the whole player screen.
-            WithProgress(viewModel) { progress ->
-                GestureOverlay(
-                    modifier = Modifier.fillMaxSize(),
-                    locked = isLocked,
-                    sensitivity = uiState.appearance.gestureSensitivity,
-                    durationMs = uiState.durationMs,
-                    currentPositionMs = progress.positionMs,
-                    onToggleControls = { controlsVisible = !controlsVisible },
-                    onSeekBy = viewModel::seekBy,
-                    seekStepMs = viewModel.seekStepMs(),
-                    onScrubPreview = { scrubPreviewMs = it },
-                    onScrubCommit = { viewModel.seekTo(it) },
-                    onFlash = { flashSide = it },
-                    onBrightnessChanged = {
-                        brightnessLevel = it
-                        showBrightnessHud = true
-                    },
-                    onVolumeChanged = { fraction, current, max ->
-                        volumeFraction = fraction
-                        volumeCurrent = current
-                        volumeMax = max
-                        showVolumeHud = true
-                    }
-                )
-            }
+            GestureOverlay(
+                modifier = Modifier.fillMaxSize(),
+                locked = isLocked,
+                sensitivity = uiState.appearance.gestureSensitivity,
+                durationMs = uiState.durationMs,
+                // Read once when a scrub begins -- no per-second recomposition of the overlay.
+                positionProvider = { viewModel.progress.value.positionMs },
+                onToggleControls = { controlsVisible = !controlsVisible },
+                onTogglePlayPause = viewModel::playPause,
+                onSeekBy = viewModel::seekBy,
+                seekStepMs = viewModel.seekStepMs(),
+                onScrubPreview = { scrubPreviewMs = it },
+                onScrubCommit = { viewModel.seekTo(it) },
+                onFlash = { flashSide = it },
+                onBrightnessChanged = {
+                    brightnessLevel = it
+                    showBrightnessHud = true
+                    brightnessTick++
+                },
+                onVolumeChanged = { fraction, current, max ->
+                    volumeFraction = fraction
+                    volumeCurrent = current
+                    volumeMax = max
+                    showVolumeHud = true
+                    volumeTick++
+                }
+            )
 
             BrightnessHud(
                 level = brightnessLevel,
@@ -355,7 +418,7 @@ fun PlayerScreen(
             visible = controlsVisible && !isLocked && !isInPip,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.TopCenter)
+            modifier = Modifier.align(Alignment.TopCenter).then(touchBump)
         ) {
             PlayerTopBar(
                 title = uiState.currentVideo?.displayName ?: "",
@@ -376,7 +439,7 @@ fun PlayerScreen(
             visible = controlsVisible && !isLocked && !isInPip,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomCenter)
+            modifier = Modifier.align(Alignment.BottomCenter).then(touchBump)
         ) {
             WithProgress(viewModel) { progress ->
                 PlayerBottomBar(
@@ -393,7 +456,11 @@ fun PlayerScreen(
                     shuffleEnabled = uiState.shuffleEnabled,
                     accentColor = playerAccent,
                     seekStepMs = viewModel.seekStepMs(),
-                    onScrub = { viewModel.seekTo(it) },
+                    onScrubPreview = { scrubPreviewMs = it },
+                    onScrubCommit = {
+                        viewModel.seekTo(it)
+                        scrubPreviewMs = null
+                    },
                     onPlayPause = viewModel::playPause,
                     onSeekBy = viewModel::seekBy,
                     onNext = viewModel::skipToNext,
@@ -419,9 +486,18 @@ fun PlayerScreen(
                 visible = controlsVisible,
                 enter = fadeIn(),
                 exit = fadeOut(),
-                modifier = Modifier.align(Alignment.BottomEnd)
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
+                    .padding(16.dp)
+                    .then(touchBump)
             ) {
-                androidx.compose.material3.IconButton(onClick = { isLocked = false; controlsVisible = true }) {
+                androidx.compose.material3.IconButton(
+                    onClick = { isLocked = false; controlsVisible = true },
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(Color.Black.copy(alpha = 0.55f), androidx.compose.foundation.shape.CircleShape)
+                ) {
                     androidx.compose.material3.Icon(
                         Icons.Outlined.Lock,
                         contentDescription = "Unlock controls",

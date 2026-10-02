@@ -102,6 +102,9 @@ private const val EXTERNAL_VIDEO_ID = -1L
 /** How often the playback position is written to disk while playing. */
 private const val POSITION_SAVE_INTERVAL_MS = 5_000L
 
+/** A saved position this close to the end is treated as "finished": the next open starts from 0. */
+private const val RESUME_END_GUARD_MS = 5_000L
+
 /** "Previous" restarts the current video when it's been playing longer than this. */
 private const val RESTART_THRESHOLD_MS = 3_000L
 
@@ -193,6 +196,7 @@ class PlayerViewModel(
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var audioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
     private var volumeBeforeMute: Float = 1f
+    private var lastRecordedSubtitles: Pair<Long, Boolean>? = null
 
     /** Identifies what was last opened, so a re-composition can't reload the queue and restart playback. */
     private var openedKey: String? = null
@@ -332,9 +336,16 @@ class PlayerViewModel(
                     subtitleTracks = subtitleOptions,
                     frameRate = selectedVideoFrameRate(tracks) ?: _uiState.value.frameRate
                 )
+                // Tracks arrive empty while a video is still preparing -- that must not be recorded as
+                // "no subtitles". And each (video, answer) pair is written once, not on every
+                // tracks update, which saves a DataStore write per change.
+                val hasSubtitles = subtitleOptions.isNotEmpty()
                 _uiState.value.currentVideo?.takeIf { it.id != EXTERNAL_VIDEO_ID }?.let { video ->
-                    viewModelScope.launch {
-                        playbackStateRepository.recordSubtitleAvailability(video.id, subtitleOptions.isNotEmpty())
+                    if (tracks.groups.isNotEmpty() && lastRecordedSubtitles != (video.id to hasSubtitles)) {
+                        lastRecordedSubtitles = video.id to hasSubtitles
+                        viewModelScope.launch {
+                            playbackStateRepository.recordSubtitleAvailability(video.id, hasSubtitles)
+                        }
                     }
                 }
             }
@@ -441,11 +452,13 @@ class PlayerViewModel(
             val startVideo = playlist[startIndex]
 
             val resumeEnabled = _uiState.value.playbackPrefs.resumePlaybackEnabled
-            val resumeMs = if (resumeEnabled) {
+            val savedMs = if (resumeEnabled) {
                 playbackStateRepository.observeState(startVideo.id).first().lastPositionMs
             } else {
                 0L
             }
+            // A video left in its last few seconds should start over, not resume into its credits.
+            val resumeMs = if (startVideo.durationMs > 0L && savedMs >= startVideo.durationMs - RESUME_END_GUARD_MS) 0L else savedMs
 
             val mediaItems = playlist.map { video ->
                 MediaItem.Builder()
@@ -525,20 +538,38 @@ class PlayerViewModel(
     }
 
     fun playPause() {
-        player.playWhenReady = !player.playWhenReady
+        // After the last video ends, "play" must start it over; a plain toggle of playWhenReady
+        // does nothing in the ENDED state, which left the button looking dead.
+        if (player.playbackState == Player.STATE_ENDED) {
+            player.seekToDefaultPosition()
+            player.play()
+        } else if (player.playWhenReady) {
+            player.pause()
+        } else {
+            player.play()
+        }
     }
 
     fun pause() {
         player.pause()
     }
 
+    /** Clamps to the video's length -- but only once that length is known (it is TIME_UNSET
+     *  while preparing; clamping to 0 then would throw the video back to the very start). */
+    private fun clampToDuration(positionMs: Long): Long {
+        val duration = player.duration
+        val upper = if (duration == C.TIME_UNSET || duration < 0L) Long.MAX_VALUE else duration
+        return positionMs.coerceIn(0L, upper)
+    }
+
     fun seekTo(positionMs: Long) {
-        player.seekTo(positionMs.coerceIn(0, player.duration.coerceAtLeast(0)))
+        player.seekTo(clampToDuration(positionMs))
+        publishProgress()
     }
 
     fun seekBy(deltaMs: Long) {
-        val target = (player.currentPosition + deltaMs).coerceIn(0, player.duration.coerceAtLeast(0))
-        player.seekTo(target)
+        player.seekTo(clampToDuration(player.currentPosition + deltaMs))
+        publishProgress()
     }
 
     /** Configured double-tap/±seek duration, in milliseconds, from Settings (default 10s). */
@@ -701,9 +732,7 @@ class PlayerViewModel(
             for (trackIndex in 0 until group.length) {
                 if (!group.isTrackSupported(trackIndex)) continue
                 val format = group.getTrackFormat(trackIndex)
-                val label = format.label
-                    ?: format.language?.uppercase()
-                    ?: "Track ${options.size + 1}"
+                val label = trackLabel(format, type, options.size + 1)
                 options += TrackOption(
                     groupIndex = groupIndex,
                     trackIndex = trackIndex,
@@ -713,6 +742,28 @@ class PlayerViewModel(
             }
         }
         return options
+    }
+
+    /**
+     * "English", "English - 5.1" ... instead of a bare language code. Uses the file's own label
+     * when it has one, and falls back to the track number.
+     */
+    private fun trackLabel(format: androidx.media3.common.Format, type: Int, number: Int): String {
+        format.label?.takeIf { it.isNotBlank() }?.let { return it }
+        val language = format.language?.takeIf { it.isNotBlank() && it != C.LANGUAGE_UNDETERMINED }?.let { code ->
+            val name = java.util.Locale.forLanguageTag(code).displayLanguage
+            if (name.isBlank() || name.equals(code, ignoreCase = true)) code.uppercase() else name
+        }
+        val channels = if (type == C.TRACK_TYPE_AUDIO) {
+            when (format.channelCount) {
+                1 -> "Mono"
+                2 -> "Stereo"
+                6 -> "5.1"
+                8 -> "7.1"
+                else -> null
+            }
+        } else null
+        return listOfNotNull(language ?: "Track $number", channels).joinToString(" - ")
     }
 
     // --- Audio boost (MX Player-style loudness boost above 100%) ---------------
