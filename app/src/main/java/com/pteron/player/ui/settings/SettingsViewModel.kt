@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.pteron.player.data.model.AspectRatioMode
+import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.AppearanceState
@@ -23,7 +24,15 @@ class SettingsViewModel(
 ) : ViewModel() {
 
     val appearance: StateFlow<AppearanceState> = appearanceRepository.state.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5000), AppearanceState(theme = appearanceRepository.cachedTheme())
+        viewModelScope, SharingStarted.WhileSubscribed(5000), appearanceRepository.cachedThemeSettings().let {
+            AppearanceState(
+                theme = it.theme,
+                canvasShade = it.canvasShade,
+                cardShade = it.cardShade,
+                folderShade = it.folderShade,
+                font = it.font
+            )
+        }
     )
     val playbackPrefs: StateFlow<PlaybackPrefsState> = playbackPrefsRepository.state.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), PlaybackPrefsState()
@@ -32,6 +41,11 @@ class SettingsViewModel(
     // --- Appearance -------------------------------------------------------------
 
     fun setTheme(theme: AppTheme) = viewModelScope.launch { appearanceRepository.setTheme(theme) }
+    fun setCanvasShade(value: Float) = viewModelScope.launch { appearanceRepository.setCanvasShade(value) }
+    fun setCardShade(value: Float) = viewModelScope.launch { appearanceRepository.setCardShade(value) }
+    fun setFolderShade(value: Float) = viewModelScope.launch { appearanceRepository.setFolderShade(value) }
+    fun resetShades() = viewModelScope.launch { appearanceRepository.resetShades() }
+    fun setFont(font: AppFont) = viewModelScope.launch { appearanceRepository.setFont(font) }
     fun setShowVideoCountBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowVideoCountBadge(value) }
     fun setShowFolderSizeBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowFolderSizeBadge(value) }
     fun setGestureSensitivity(value: Float) = viewModelScope.launch { appearanceRepository.setGestureSensitivity(value) }

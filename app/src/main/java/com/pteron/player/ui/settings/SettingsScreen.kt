@@ -81,14 +81,19 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.AspectRatioMode
+import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.theme.colors
+import com.pteron.player.theme.fontFamily
 import com.pteron.player.theme.readableOn
-import com.pteron.player.ui.common.CircularActionButton
+import com.pteron.player.ui.common.DarkModeButton
+import com.pteron.player.ui.common.SettingsSet
+import com.pteron.player.ui.common.SettingsSetCard
+import com.pteron.player.ui.common.SettingsSetRow
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
@@ -99,7 +104,7 @@ import kotlin.math.roundToInt
  * one swaps in the settings that belong to it.
  */
 private enum class SettingsSection(val title: String, val subtitle: String, val icon: ImageVector) {
-    APPEARANCE("Theme", "Pick a ready-made color theme", Icons.Outlined.Palette),
+    APPEARANCE("Appearance", "Theme, shades and font", Icons.Outlined.Palette),
     LIBRARY("Library & folders", "Folder tile badges", Icons.Outlined.FolderOpen),
     PLAYER("Player controls", "Gestures, seeking and control style", Icons.Outlined.TouchApp),
     PLAYBACK("Playback", "Resume, auto-play and screen behavior", Icons.Outlined.PlayCircle),
@@ -168,11 +173,7 @@ fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestinati
                             )
                         }
                     }
-                    CircularActionButton(
-                        icon = Icons.Outlined.DarkMode,
-                        contentDescription = "Toggle dark mode",
-                        onClick = viewModel::toggleDarkMode
-                    )
+                    DarkModeButton(onClick = viewModel::toggleDarkMode)
                 }
 
                 // Only the layer being shown is composed, so an unopened section costs nothing.
@@ -212,7 +213,7 @@ private fun SettingsPage(spacing: Dp = 8.dp, content: @Composable ColumnScope.()
         modifier = Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 26.dp, vertical = 16.dp),
+            .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 108.dp),
         verticalArrangement = Arrangement.spacedBy(spacing),
         content = content
     )
@@ -220,9 +221,18 @@ private fun SettingsPage(spacing: Dp = 8.dp, content: @Composable ColumnScope.()
 
 @Composable
 private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
-    SettingsPage(spacing = 4.dp) {
-        SettingsSection.entries.forEach { section ->
-            SectionHeaderCard(section = section, onClick = { onOpen(section) })
+    SettingsPage {
+        // One set holding every section card. When the list grows, split it into several sets.
+        val sections = SettingsSection.entries
+        SettingsSet(count = sections.size) { index, shape ->
+            val section = sections[index]
+            SettingsSetRow(
+                icon = section.icon,
+                title = section.title,
+                subtitle = section.subtitle,
+                shape = shape,
+                onClick = { onOpen(section) }
+            )
         }
     }
 }
@@ -242,56 +252,6 @@ private fun SettingsCard(
     )
 }
 
-@Composable
-private fun SectionHeaderCard(section: SettingsSection, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(percent = 50)
-    Card(
-        // clip() sits outside bouncyClickable so the press ripple follows the rounded corners.
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(shape)
-            .semantics { role = Role.Button }
-            .bouncyClickable(onClick = onClick),
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 18.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(48.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(MaterialTheme.colorScheme.secondaryContainer),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = section.icon,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(section.title, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    section.subtitle,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
-    }
-}
-
 // --- Layer 2: the settings under one header ---------------------------------------------------
 
 @Composable
@@ -306,6 +266,8 @@ private fun SettingsSectionContent(
             SettingsSection.APPEARANCE -> {
                 LabeledGroup("Light themes") { ThemeGrid(lightThemes, appearance.theme, viewModel::setTheme) }
                 LabeledGroup("Dark themes") { ThemeGrid(darkThemes, appearance.theme, viewModel::setTheme) }
+                LabeledGroup("Shades") { ShadeCard(appearance, viewModel) }
+                LabeledGroup("Font") { FontSet(appearance.font, viewModel::setFont) }
             }
             SettingsSection.LIBRARY -> {
                 FolderAppearanceCard(appearance, viewModel)
@@ -401,8 +363,10 @@ private fun ThemePreviewCard(
                 // Two folders.
                 val folderSize = Size(w * 0.36f, h * 0.30f)
                 val folderCorner = CornerRadius(h * 0.06f)
-                drawRoundRect(colors.accent, Offset(w * 0.10f, h * 0.25f), folderSize, folderCorner)
-                drawRoundRect(colors.accent, Offset(w * 0.54f, h * 0.25f), folderSize, folderCorner)
+                drawRoundRect(colors.folder, Offset(w * 0.10f, h * 0.25f), folderSize, folderCorner)
+                drawRoundRect(colors.folder, Offset(w * 0.54f, h * 0.25f), folderSize, folderCorner)
+                drawCircle(colors.accent, radius = h * 0.04f, center = Offset(w * 0.17f, h * 0.31f))
+                drawCircle(colors.accent, radius = h * 0.04f, center = Offset(w * 0.61f, h * 0.31f))
                 // A card with a switch.
                 drawRoundRect(
                     colors.card, Offset(w * 0.10f, h * 0.61f), Size(w * 0.80f, h * 0.15f), CornerRadius(h * 0.05f)
@@ -437,6 +401,89 @@ private fun ThemePreviewCard(
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             modifier = Modifier.padding(start = 2.dp)
         )
+    }
+}
+
+// --- Shades and font ---------------------------------------------------------------------------
+
+private fun shadeLabel(value: Float): String = when {
+    value > 0.005f -> "Darker ${(value * 100).roundToInt()}%"
+    value < -0.005f -> "Lighter ${(-value * 100).roundToInt()}%"
+    else -> "Theme default"
+}
+
+/** Three sliders -- canvas, cards, folders -- each saved once, when the finger lifts. */
+@Composable
+private fun ShadeCard(appearance: AppearanceState, viewModel: SettingsViewModel) {
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            ShadeSlider("Canvas", appearance.canvasShade, viewModel::setCanvasShade)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ShadeSlider("Cards", appearance.cardShade, viewModel::setCardShade)
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            ShadeSlider("Folders", appearance.folderShade, viewModel::setFolderShade)
+            Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                TextButton(onClick = viewModel::resetShades) { Text("Reset shades") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShadeSlider(title: String, value: Float, onCommit: (Float) -> Unit) {
+    SliderSetting(
+        title = title,
+        value = value,
+        valueRange = -1f..1f,
+        steps = 19,
+        onCommit = onCommit,
+        valueLabel = ::shadeLabel,
+        footer = {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("Lighter", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text("Darker", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
+}
+
+/** One card per font, each previewed in its own typeface; the chosen one takes the accent shade. */
+@Composable
+private fun FontSet(selected: AppFont, onSelect: (AppFont) -> Unit) {
+    val fonts = AppFont.entries
+    SettingsSet(count = fonts.size) { index, shape ->
+        val font = fonts[index]
+        val isSelected = font == selected
+        val scheme = MaterialTheme.colorScheme
+        val content = if (isSelected) scheme.onPrimary else scheme.onSurface
+        SettingsSetCard(
+            shape = shape,
+            onClick = { onSelect(font) },
+            color = if (isSelected) scheme.primary else scheme.surfaceContainer
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        font.displayName,
+                        style = MaterialTheme.typography.titleSmall.copy(fontFamily = font.fontFamily()),
+                        color = content
+                    )
+                    Text(
+                        "The quick brown fox jumps over 0123456789",
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = font.fontFamily()),
+                        color = content.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+                if (isSelected) {
+                    Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 
@@ -728,7 +775,7 @@ private fun DataCards(viewModel: SettingsViewModel) {
         DataActionCard(
             icon = Icons.Outlined.RestartAlt,
             title = "Reset appearance",
-            description = "Restores the theme, folder badges, gesture sensitivity, sorting and view mode to their defaults.",
+            description = "Restores the theme, shades, font, folder badges, gesture sensitivity, sorting and view mode to their defaults.",
             actionLabel = "Reset",
             onAction = { showResetConfirm = true }
         )
