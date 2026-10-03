@@ -9,6 +9,7 @@ import com.pteron.player.data.media.VideoThumbnailFetcher
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackStateRepository
+import com.pteron.player.data.prefs.PlaylistRepository
 
 /**
  * Manual dependency container. The app intentionally avoids a DI framework
@@ -24,6 +25,7 @@ class PteronApp : Application(), ImageLoaderFactory {
     val appearancePrefsRepository: AppearancePrefsRepository by lazy { AppearancePrefsRepository(this) }
     val playbackStateRepository: PlaybackStateRepository by lazy { PlaybackStateRepository(this) }
     val playbackPrefsRepository: PlaybackPrefsRepository by lazy { PlaybackPrefsRepository(this) }
+    val playlistRepository: PlaylistRepository by lazy { PlaylistRepository(this) }
 
     /**
      * Coil calls this the first time an image is requested (not at app start). A shared
