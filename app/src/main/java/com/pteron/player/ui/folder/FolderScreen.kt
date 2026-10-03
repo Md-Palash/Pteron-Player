@@ -28,11 +28,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.pteron.player.data.model.VideoItem
 import com.pteron.player.data.model.ViewMode
+import com.pteron.player.ui.playlists.AddToPlaylistSheet
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.EmptyLibraryState
@@ -55,6 +59,12 @@ fun FolderScreen(
     val uiState by viewModel.uiState.collectAsState()
     // `visibleVideos` filters and sorts the whole list on every read, so compute it once per state.
     val visibleVideos = remember(uiState) { uiState.visibleVideos }
+
+    // The video whose "Add to playlist" sheet is open, if any.
+    var playlistTarget by remember { mutableStateOf<VideoItem?>(null) }
+    playlistTarget?.let { target ->
+        AddToPlaylistSheet(video = target, onDismiss = { playlistTarget = null })
+    }
 
     Scaffold(
         floatingActionButton = {
@@ -131,7 +141,8 @@ fun FolderScreen(
                                 onClick = { onOpenVideo(video.id, video.bucketId) },
                                 onToggleFavorite = { viewModel.toggleFavorite(video) },
                                 onToggleWatched = { viewModel.toggleWatched(video) },
-                                onClearProgress = { viewModel.clearProgress(video) }
+                                onClearProgress = { viewModel.clearProgress(video) },
+                                onAddToPlaylist = { playlistTarget = video }
                             )
                         }
                     }
@@ -146,7 +157,8 @@ fun FolderScreen(
                                 onClick = { onOpenVideo(video.id, video.bucketId) },
                                 onToggleFavorite = { viewModel.toggleFavorite(video) },
                                 onToggleWatched = { viewModel.toggleWatched(video) },
-                                onClearProgress = { viewModel.clearProgress(video) }
+                                onClearProgress = { viewModel.clearProgress(video) },
+                                onAddToPlaylist = { playlistTarget = video }
                             )
                         }
                     }

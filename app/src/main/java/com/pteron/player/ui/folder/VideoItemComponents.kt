@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.DropdownMenu
@@ -74,6 +75,7 @@ fun VideoListRow(
     onToggleFavorite: () -> Unit,
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Row(
@@ -150,7 +152,8 @@ fun VideoListRow(
                 VideoOverflowMenu(
                     video = video,
                     onToggleWatched = onToggleWatched,
-                    onClearProgress = onClearProgress
+                    onClearProgress = onClearProgress,
+                    onAddToPlaylist = onAddToPlaylist
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -215,6 +218,7 @@ fun VideoGridTile(
     onToggleFavorite: () -> Unit,
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier.videoCard(onClick)) {
@@ -270,6 +274,7 @@ fun VideoGridTile(
                     video = video,
                     onToggleWatched = onToggleWatched,
                     onClearProgress = onClearProgress,
+                    onAddToPlaylist = onAddToPlaylist,
                     tint = Color.White
                 )
             }
@@ -309,6 +314,7 @@ private fun VideoOverflowMenu(
     video: VideoItem,
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
+    onAddToPlaylist: (() -> Unit)? = null,
     tint: Color = MaterialTheme.colorScheme.onSurfaceVariant
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -322,6 +328,16 @@ private fun VideoOverflowMenu(
             )
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            if (onAddToPlaylist != null) {
+                DropdownMenuItem(
+                    text = { Text("Add to playlist") },
+                    leadingIcon = { Icon(Icons.Outlined.PlaylistAdd, contentDescription = null) },
+                    onClick = {
+                        onAddToPlaylist()
+                        expanded = false
+                    }
+                )
+            }
             DropdownMenuItem(
                 text = { Text(if (video.isWatched) "Mark as unwatched" else "Mark as watched") },
                 leadingIcon = {
