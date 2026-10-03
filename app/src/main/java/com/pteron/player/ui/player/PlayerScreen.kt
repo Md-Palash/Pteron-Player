@@ -83,7 +83,9 @@ fun PlayerScreen(
     /** Set when the video was opened from another app; [videoId]/[bucketId] are ignored then. */
     externalUri: String? = null,
     /** Start the folder queue with shuffle on ("Shuffle play"). */
-    shuffle: Boolean = false
+    shuffle: Boolean = false,
+    /** Play this playlist's queue instead of the folder's; [NO_PLAYLIST] means use the folder. */
+    playlistId: Long = NO_PLAYLIST
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -171,11 +173,11 @@ fun PlayerScreen(
     // While locked, system Back must not leave the player: it just shows the unlock button.
     BackHandler(enabled = isLocked) { controlsVisible = true }
 
-    LaunchedEffect(videoId, bucketId, externalUri, shuffle) {
+    LaunchedEffect(videoId, bucketId, externalUri, shuffle, playlistId) {
         if (externalUri != null) {
             viewModel.openExternal(Uri.parse(externalUri))
         } else {
-            viewModel.openVideo(videoId, bucketId, shuffle)
+            viewModel.openVideo(videoId, bucketId, shuffle, playlistId)
         }
     }
 

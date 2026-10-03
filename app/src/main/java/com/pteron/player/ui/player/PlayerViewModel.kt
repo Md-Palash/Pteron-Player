@@ -33,6 +33,7 @@ import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.data.prefs.PlaybackStateRepository
+import com.pteron.player.data.prefs.PlaylistRepository
 import com.pteron.player.playback.PlaybackSessionHolder
 import com.pteron.player.playback.PlaybackSessionService
 import com.pteron.player.util.PipController
@@ -96,6 +97,9 @@ data class PlayerProgress(
     val bufferedPercentage: Int = 0
 )
 
+/** Passed as the playlist id when a video is opened from a folder or the library, not a playlist. */
+const val NO_PLAYLIST = -1L
+
 /** Id of a video opened from another app: it has no MediaStore row, so nothing is persisted for it. */
 private const val EXTERNAL_VIDEO_ID = -1L
 
@@ -113,7 +117,8 @@ class PlayerViewModel(
     private val mediaStoreRepository: MediaStoreRepository,
     private val playbackStateRepository: PlaybackStateRepository,
     private val appearancePrefsRepository: AppearancePrefsRepository,
-    private val playbackPrefsRepository: PlaybackPrefsRepository
+    private val playbackPrefsRepository: PlaybackPrefsRepository,
+    private val playlistRepository: PlaylistRepository
 ) : AndroidViewModel(application) {
 
     private val trackSelector = DefaultTrackSelector(application)
@@ -427,8 +432,8 @@ class PlayerViewModel(
      * Calling this again with the same arguments is a no-op, so a re-composition of the
      * player screen can never reload the queue or restart the video.
      */
-    fun openVideo(videoId: Long, bucketId: String, shuffle: Boolean = false) {
-        val key = "lib|$videoId|$bucketId|$shuffle"
+    fun openVideo(videoId: Long, bucketId: String, shuffle: Boolean = false, playlistId: Long = NO_PLAYLIST) {
+        val key = "lib|$videoId|$bucketId|$shuffle|$playlistId"
         if (openedKey == key) return
         openedKey = key
 
@@ -436,8 +441,13 @@ class PlayerViewModel(
             // Only this folder's rows, not the whole device library (see MediaStoreRepository) --
             // opening a video is on the critical path to first frame, so this matters for RAM,
             // CPU and battery alike, especially on large libraries.
-            var playlist = mediaStoreRepository.loadVideosInBucket(bucketId)
-            if (playlist.none { it.id == videoId }) {
+            var playlist = if (playlistId != NO_PLAYLIST) {
+                // A user playlist: its own order, whatever folders the videos live in.
+                mediaStoreRepository.loadVideosByIds(playlistRepository.get(playlistId)?.videoIds.orEmpty())
+            } else {
+                mediaStoreRepository.loadVideosInBucket(bucketId)
+            }
+            if (playlistId == NO_PLAYLIST && playlist.none { it.id == videoId }) {
                 // Rare: the video isn't in the bucket it claims (e.g. stale MediaStore data).
                 // Fall back to a full scan rather than failing to open it.
                 mediaStoreRepository.loadAllVideos().firstOrNull { it.id == videoId }?.let { playlist = listOf(it) }
@@ -881,12 +891,14 @@ class PlayerViewModel(
         private val mediaStoreRepository: MediaStoreRepository,
         private val playbackStateRepository: PlaybackStateRepository,
         private val appearancePrefsRepository: AppearancePrefsRepository,
-        private val playbackPrefsRepository: PlaybackPrefsRepository
+        private val playbackPrefsRepository: PlaybackPrefsRepository,
+        private val playlistRepository: PlaylistRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
             return PlayerViewModel(
-                application, mediaStoreRepository, playbackStateRepository, appearancePrefsRepository, playbackPrefsRepository
+                application, mediaStoreRepository, playbackStateRepository, appearancePrefsRepository,
+                playbackPrefsRepository, playlistRepository
             ) as T
         }
     }
