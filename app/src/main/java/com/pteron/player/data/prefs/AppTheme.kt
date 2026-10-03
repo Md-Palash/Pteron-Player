@@ -48,20 +48,23 @@ enum class AppTheme(
 }
 
 /**
- * Fonts the person can choose from in Settings. Only [COMFORTAA] is a bundled file; the rest use
- * Android's built-in font families, so adding them costs nothing in APK size and needs no
- * INTERNET permission. To offer another bundled font, add an entry here and map it in
- * `AppFont.fontFamily()` (theme/Type.kt).
+ * Fonts the person can choose from in Settings. [SYSTEM] and [SERIF] are Android's built-in
+ * families; every other entry is a font file bundled in `res/font/`. To offer another one, add the
+ * file(s) there, add an entry here and map it in `AppFont.fontFamily()` (theme/Type.kt).
  */
 enum class AppFont(val displayName: String) {
-    COMFORTAA("Comfortaa"),
     SYSTEM("System default"),
+    INTER("Inter"),
+    ROBOTO("Roboto"),
+    LATO("Lato"),
+    OUTFIT("Outfit"),
     SERIF("Serif"),
-    MONOSPACE("Monospace"),
-    CURSIVE("Cursive");
+    PLAYFAIR("Playfair Display"),
+    CINZEL("Cinzel"),
+    PLAYWRITE("Playwrite");
 
     companion object {
-        val DEFAULT = COMFORTAA
+        val DEFAULT = SYSTEM
 
         fun fromName(name: String?): AppFont = entries.firstOrNull { it.name == name } ?: DEFAULT
     }
