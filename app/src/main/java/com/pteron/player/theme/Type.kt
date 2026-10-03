@@ -4,34 +4,53 @@ import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.pteron.player.R
 import com.pteron.player.data.prefs.AppFont
 
 /**
- * Comfortaa, the default font. IMPORTANT: this references font files that are not bundled by
- * default -- they must already be in app/src/main/res/font/ as comfortaa_light.ttf,
- * comfortaa_regular.ttf, comfortaa_medium.ttf, comfortaa_semibold.ttf, comfortaa_bold.ttf.
- *
- * Font files stay local resources (no downloadable-fonts API) because the app requests no
- * INTERNET permission.
+ * A variable font (one file holding every weight): the four weights the app's type scale uses are
+ * each pinned to their own point on the font's weight axis. Works on API 26+, which is the app's
+ * minSdk.
  */
-private val ComfortaaFamily = FontFamily(
-    Font(R.font.comfortaa_light, FontWeight.Light),
-    Font(R.font.comfortaa_regular, FontWeight.Normal),
-    Font(R.font.comfortaa_medium, FontWeight.Medium),
-    Font(R.font.comfortaa_semibold, FontWeight.SemiBold),
-    Font(R.font.comfortaa_bold, FontWeight.Bold)
+private fun variableFamily(resId: Int): FontFamily = FontFamily(
+    listOf(FontWeight.Normal, FontWeight.Medium, FontWeight.SemiBold, FontWeight.Bold).map { weight ->
+        Font(
+            resId = resId,
+            weight = weight,
+            variationSettings = FontVariation.Settings(FontVariation.weight(weight.weight))
+        )
+    }
 )
 
-/** The Compose font family for a font choice. The non-Comfortaa ones are built into Android. */
+private val InterFamily = variableFamily(R.font.inter)
+private val RobotoFamily = variableFamily(R.font.roboto)
+private val OutfitFamily = variableFamily(R.font.outfit)
+private val PlayfairFamily = variableFamily(R.font.playfair)
+private val CinzelFamily = variableFamily(R.font.cinzel)
+private val PlaywriteFamily = variableFamily(R.font.playwrite)
+
+/** Lato is not a variable font: two static files, regular for the lighter weights, bold for the heavier ones. */
+private val LatoFamily = FontFamily(
+    Font(R.font.lato_regular, FontWeight.Normal),
+    Font(R.font.lato_regular, FontWeight.Medium),
+    Font(R.font.lato_bold, FontWeight.SemiBold),
+    Font(R.font.lato_bold, FontWeight.Bold)
+)
+
+/** The Compose font family for a font choice. */
 fun AppFont.fontFamily(): FontFamily = when (this) {
-    AppFont.COMFORTAA -> ComfortaaFamily
     AppFont.SYSTEM -> FontFamily.Default
+    AppFont.INTER -> InterFamily
+    AppFont.ROBOTO -> RobotoFamily
+    AppFont.LATO -> LatoFamily
+    AppFont.OUTFIT -> OutfitFamily
     AppFont.SERIF -> FontFamily.Serif
-    AppFont.MONOSPACE -> FontFamily.Monospace
-    AppFont.CURSIVE -> FontFamily.Cursive
+    AppFont.PLAYFAIR -> PlayfairFamily
+    AppFont.CINZEL -> CinzelFamily
+    AppFont.PLAYWRITE -> PlaywriteFamily
 }
 
 private val defaultType = Typography()
