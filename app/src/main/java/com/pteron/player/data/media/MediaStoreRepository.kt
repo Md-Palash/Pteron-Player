@@ -50,6 +50,21 @@ class MediaStoreRepository(private val context: Context) {
         selectionArgs = arrayOf(bucketId)
     )
 
+    /**
+     * Loads specific videos by id and returns them in the order of [ids] (a playlist's order).
+     * Ids that no longer exist on the device are simply left out.
+     */
+    suspend fun loadVideosByIds(ids: List<Long>): List<VideoItem> {
+        if (ids.isEmpty()) return emptyList()
+        val found = ids.distinct().chunked(500).flatMap { chunk ->
+            queryVideos(
+                selection = "${MediaStore.Video.Media._ID} IN (${chunk.joinToString(",") { "?" }})",
+                selectionArgs = chunk.map { it.toString() }.toTypedArray()
+            )
+        }.associateBy { it.id }
+        return ids.mapNotNull { found[it] }
+    }
+
     private suspend fun queryVideos(selection: String?, selectionArgs: Array<String>?): List<VideoItem> =
         withContext(Dispatchers.IO) {
             val results = mutableListOf<VideoItem>()
