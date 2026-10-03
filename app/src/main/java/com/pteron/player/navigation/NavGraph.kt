@@ -25,7 +25,10 @@ import com.pteron.player.ui.library.LibraryScreen
 import com.pteron.player.ui.library.LibraryViewModel
 import com.pteron.player.ui.player.PlayerScreen
 import com.pteron.player.ui.player.PlayerViewModel
+import com.pteron.player.ui.playlists.PlaylistDetailScreen
+import com.pteron.player.ui.playlists.PlaylistDetailViewModel
 import com.pteron.player.ui.playlists.PlaylistsScreen
+import com.pteron.player.ui.playlists.PlaylistsViewModel
 import com.pteron.player.ui.settings.SettingsScreen
 import com.pteron.player.ui.settings.SettingsViewModel
 import com.pteron.player.ui.videos.VideosScreen
@@ -58,7 +61,8 @@ private val popExit = slideOutHorizontally(animationSpec = tween(280)) { it / 4 
 @Composable
 private fun rememberPlayerViewModel(app: PteronApp): PlayerViewModel = viewModel(
     factory = PlayerViewModel.Factory(
-        app, app.mediaStoreRepository, app.playbackStateRepository, app.appearancePrefsRepository, app.playbackPrefsRepository
+        app, app.mediaStoreRepository, app.playbackStateRepository, app.appearancePrefsRepository,
+        app.playbackPrefsRepository, app.playlistRepository
     )
 )
 
@@ -122,9 +126,37 @@ fun PteronNavGraph(
 
         composable(Screen.Playlists.route) {
             val scope = rememberCoroutineScope()
+            val viewModel: PlaylistsViewModel = viewModel(
+                factory = PlaylistsViewModel.Factory(app.playlistRepository)
+            )
             PlaylistsScreen(
+                viewModel = viewModel,
+                onOpenPlaylist = { id -> navController.navigate(Screen.PlaylistDetail.createRoute(id)) },
                 onNavigate = navController::navigateToTab,
                 onToggleDarkMode = { scope.launch { app.appearancePrefsRepository.toggleDarkMode() } }
+            )
+        }
+
+        composable(
+            route = Screen.PlaylistDetail.route,
+            arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
+            enterTransition = { pushEnter },
+            exitTransition = { pushExit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) { backStackEntry ->
+            val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
+            val viewModel: PlaylistDetailViewModel = viewModel(
+                factory = PlaylistDetailViewModel.Factory(playlistId, app.playlistRepository, app.mediaStoreRepository)
+            )
+            PlaylistDetailScreen(
+                viewModel = viewModel,
+                onBack = navController::popBackStack,
+                onPlay = { video, shuffle ->
+                    navController.navigate(
+                        Screen.Player.createRoute(video.id, video.bucketId, shuffle = shuffle, playlistId = playlistId)
+                    )
+                }
             )
         }
 
@@ -173,6 +205,10 @@ fun PteronNavGraph(
                 navArgument("shuffle") {
                     type = NavType.BoolType
                     defaultValue = false
+                },
+                navArgument("playlistId") {
+                    type = NavType.LongType
+                    defaultValue = -1L
                 }
             ),
             enterTransition = { pushEnter },
@@ -183,10 +219,12 @@ fun PteronNavGraph(
             val videoId = backStackEntry.arguments?.getLong("videoId") ?: return@composable
             val bucketId = backStackEntry.arguments?.getString("bucketId").orEmpty()
             val shuffle = backStackEntry.arguments?.getBoolean("shuffle") ?: false
+            val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: -1L
             PlayerScreen(
                 videoId = videoId,
                 bucketId = bucketId,
                 shuffle = shuffle,
+                playlistId = playlistId,
                 viewModel = rememberPlayerViewModel(app),
                 onBack = navController::popBackStack
             )

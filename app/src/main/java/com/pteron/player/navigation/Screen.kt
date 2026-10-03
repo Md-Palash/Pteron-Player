@@ -17,9 +17,14 @@ sealed class Screen(val route: String) {
      * A video from the MediaStore library, played together with the rest of its folder.
      * [shuffle] starts the folder queue with shuffle turned on (used by "Shuffle play").
      */
-    data object Player : Screen("player/{videoId}/{bucketId}?shuffle={shuffle}") {
-        fun createRoute(videoId: Long, bucketId: String, shuffle: Boolean = false) =
-            "player/$videoId/${Uri.encode(bucketId)}?shuffle=$shuffle"
+    data object Player : Screen("player/{videoId}/{bucketId}?shuffle={shuffle}&playlistId={playlistId}") {
+        /** [playlistId] >= 0 plays that playlist's queue instead of the folder's. */
+        fun createRoute(videoId: Long, bucketId: String, shuffle: Boolean = false, playlistId: Long = -1L) =
+            "player/$videoId/${Uri.encode(bucketId)}?shuffle=$shuffle&playlistId=$playlistId"
+    }
+
+    data object PlaylistDetail : Screen("playlist/{playlistId}") {
+        fun createRoute(playlistId: Long) = "playlist/$playlistId"
     }
 
     /** A video opened from another app (file manager, browser, ...) via ACTION_VIEW. */
