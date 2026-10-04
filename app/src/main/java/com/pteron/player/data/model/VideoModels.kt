@@ -30,6 +30,8 @@ data class VideoItem(
     val width: Int,
     val height: Int,
     val mimeType: String,
+    /** The folder's display name as MediaStore reports it (empty if unknown). */
+    val bucketName: String = "",
     // Populated lazily/best-effort; null means "unknown", never guessed.
     val hasEmbeddedSubtitleTrack: Boolean? = null,
     // Persisted, user/device-derived state (not part of the MediaStore row).
