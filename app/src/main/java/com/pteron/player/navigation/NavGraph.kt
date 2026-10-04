@@ -1,7 +1,26 @@
 package com.pteron.player.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.navigation.compose.currentBackStackEntryAsState
+import com.pteron.player.ui.common.PteronBottomNavBar
+import com.pteron.player.util.TabReselect
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
@@ -52,6 +71,16 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  *  feels like motion rather than an instant cut. Tab switches (bottom nav)
  *  intentionally don't use this -- see [navigateToTab] -- since a lateral
  *  push motion would read oddly for switching between top-level sections. */
+/**
+ * Defaults for every destination that doesn't set its own (the four tabs). Navigation Compose's
+ * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
+ * these are short and the incoming screen waits a beat so the two never muddy each other.
+ */
+private val tabEnter = fadeIn(tween(200, delayMillis = 50))
+private val tabExit = fadeOut(tween(110))
+private val tabPopEnter = fadeIn(tween(200, delayMillis = 50))
+private val tabPopExit = fadeOut(tween(110))
+
 private val pushEnter = slideInHorizontally(animationSpec = tween(280)) { it / 4 } + fadeIn(tween(220))
 private val pushExit = fadeOut(tween(160))
 private val popEnter = fadeIn(tween(200))
@@ -80,6 +109,15 @@ fun PteronNavGraph(
 ) {
     val navController = rememberNavController()
 
+    // One bottom bar for the whole app, above the navigation host. Previously every tab drew its own
+    // copy, so switching tabs cross-faded two bars on top of each other (a visible flicker).
+    val navEntry by navController.currentBackStackEntryAsState()
+    val route = navEntry?.destination?.route
+    val currentTab = BottomNavDestination.entries.firstOrNull { it.screen.route == route }
+    var lastTab by remember { mutableStateOf(BottomNavDestination.LIBRARY) }
+    // Kept so the bar still shows the right highlight while it slides away.
+    SideEffect { if (currentTab != null) lastTab = currentTab }
+
     LaunchedEffect(externalVideoUri) {
         if (externalVideoUri != null) {
             val current = navController.currentDestination?.route
@@ -96,7 +134,15 @@ fun PteronNavGraph(
         }
     }
 
-    NavHost(navController = navController, startDestination = Screen.Library.route) {
+    Box {
+    NavHost(
+        navController = navController,
+        startDestination = Screen.Library.route,
+        enterTransition = { tabEnter },
+        exitTransition = { tabExit },
+        popEnterTransition = { tabPopEnter },
+        popExitTransition = { tabPopExit }
+    ) {
         composable(Screen.Library.route) {
             val viewModel: LibraryViewModel = viewModel(
                 factory = LibraryViewModel.Factory(
@@ -106,8 +152,7 @@ fun PteronNavGraph(
             LibraryScreen(
                 viewModel = viewModel,
                 onOpenFolder = { bucketId, name -> navController.navigate(Screen.Folder.createRoute(bucketId, name)) },
-                onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) },
-                onNavigate = navController::navigateToTab
+                onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) }
             )
         }
 
@@ -119,8 +164,7 @@ fun PteronNavGraph(
             )
             VideosScreen(
                 viewModel = viewModel,
-                onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) },
-                onNavigate = navController::navigateToTab
+                onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) }
             )
         }
 
@@ -132,7 +176,6 @@ fun PteronNavGraph(
             PlaylistsScreen(
                 viewModel = viewModel,
                 onOpenPlaylist = { id -> navController.navigate(Screen.PlaylistDetail.createRoute(id)) },
-                onNavigate = navController::navigateToTab,
                 onToggleDarkMode = { scope.launch { app.appearancePrefsRepository.toggleDarkMode() } }
             )
         }
@@ -166,7 +209,7 @@ fun PteronNavGraph(
                     app.appearancePrefsRepository, app.playbackPrefsRepository, app.playbackStateRepository
                 )
             )
-            SettingsScreen(viewModel = viewModel, onNavigate = navController::navigateToTab)
+            SettingsScreen(viewModel = viewModel)
         }
 
         composable(
@@ -247,5 +290,27 @@ fun PteronNavGraph(
                 onBack = navController::popBackStack
             )
         }
+    }
+
+    AnimatedVisibility(
+        visible = currentTab != null,
+        enter = fadeIn(tween(200)) + slideInVertically(tween(260)) { it },
+        exit = fadeOut(tween(140)) + slideOutVertically(tween(200)) { it },
+        modifier = Modifier.align(Alignment.BottomCenter)
+    ) {
+        PteronBottomNavBar(
+            current = currentTab ?: lastTab,
+            onSelect = { destination ->
+                if (destination == currentTab) {
+                    TabReselect.events.tryEmit(destination)
+                } else {
+                    navController.navigateToTab(destination)
+                }
+            },
+            modifier = Modifier
+                .windowInsetsPadding(WindowInsets.navigationBars)
+                .padding(horizontal = 40.dp, vertical = 18.dp)
+        )
+    }
     }
 }
