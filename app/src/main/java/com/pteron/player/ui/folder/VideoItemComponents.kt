@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,8 +58,13 @@ import com.pteron.player.util.formatTimecode
  */
 private const val CardRadiusDp = 18
 private val VideoCardShape = RoundedCornerShape(CardRadiusDp.dp)
-private val ThumbTopShape = RoundedCornerShape(topStart = CardRadiusDp.dp, topEnd = CardRadiusDp.dp)
-private val ThumbStartShape = RoundedCornerShape(topStart = CardRadiusDp.dp, bottomStart = CardRadiusDp.dp)
+
+/** List rows: the thumbnail is inset from the card edge by this much, with its own rounded corners. */
+private val ListThumbInset = 8.dp
+private val ListThumbShape = RoundedCornerShape(12.dp)
+
+/** Grid tiles: the thumbnail fills the whole card; width / height of the tile. */
+private const val GridTileAspect = 1.45f
 
 /** Card chrome shared by the list row and the grid tile: rounded, medium shade, soft outline. */
 @Composable
@@ -83,12 +89,13 @@ fun VideoListRow(
             .fillMaxWidth()
             .height(104.dp)
             .videoCard(onClick)
+            .padding(ListThumbInset)
     ) {
         Box(
             modifier = Modifier
                 .width(132.dp)
                 .fillMaxHeight()
-                .clip(ThumbStartShape)
+                .clip(ListThumbShape)
         ) {
             ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
             Box(
@@ -132,7 +139,7 @@ fun VideoListRow(
             }
         }
 
-        Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.weight(1f).padding(start = 12.dp, end = 4.dp, top = 2.dp, bottom = 2.dp)) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
                 Text(
                     text = video.displayName,
@@ -221,88 +228,108 @@ fun VideoGridTile(
     onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.videoCard(onClick)) {
-        Box(modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f).clip(ThumbTopShape)) {
-            ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(4.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
-            ) {
-                Text(formatTimecode(video.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-            }
-            if (video.isWatched) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp)
-                        .size(18.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.tertiaryContainer),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(12.dp))
-                }
-            } else if (video.lastPositionMs == 0L) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(4.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(MaterialTheme.colorScheme.secondaryContainer)
-                        .padding(horizontal = 6.dp, vertical = 1.dp)
-                ) {
-                    Text("NEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
-                }
-            }
+    // The thumbnail fills the whole card; the title and details sit on a bottom scrim above it.
+    Box(modifier = modifier.aspectRatio(GridTileAspect).videoCard(onClick)) {
+        ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
+
+        // Bottom scrim: keeps the text readable on any thumbnail without a hard edge.
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))))
+                .padding(start = 10.dp, end = 10.dp, top = 26.dp, bottom = 9.dp)
+        ) {
+            Text(
+                video.displayName,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
             Row(
-                modifier = Modifier.align(Alignment.TopEnd),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                IconButton(onClick = onToggleFavorite, modifier = Modifier.size(28.dp)) {
-                    Icon(
-                        imageVector = if (video.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                        contentDescription = "Favorite",
-                        tint = if (video.isFavorite) MaterialTheme.colorScheme.primary else Color.White,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-                VideoOverflowMenu(
-                    video = video,
-                    onToggleWatched = onToggleWatched,
-                    onClearProgress = onClearProgress,
-                    onAddToPlaylist = onAddToPlaylist,
-                    tint = Color.White
+                Text(
+                    text = if (video.lastPositionMs > 0L && !video.isWatched) {
+                        "Resume ${formatTimecode(video.lastPositionMs)} • ${formatPercent(video.progressFraction)}"
+                    } else {
+                        formatFileSize(video.sizeBytes)
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.85f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
-            }
-            if (video.progressFraction in 0.01f..0.98f) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(3.dp)
-                        .align(Alignment.BottomCenter)
-                        .background(Color.White.copy(alpha = 0.3f))
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Color.Black.copy(alpha = 0.55f))
+                        .padding(horizontal = 4.dp, vertical = 1.dp)
                 ) {
-                    Box(Modifier.fillMaxWidth(video.progressFraction).fillMaxSize().background(MaterialTheme.colorScheme.primary))
+                    Text(formatTimecode(video.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
                 }
             }
         }
-        Column(modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp)) {
-            Text(video.displayName, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (video.lastPositionMs > 0L && !video.isWatched) {
-                Text(
-                    "Resume ${formatTimecode(video.lastPositionMs)} • ${formatPercent(video.progressFraction)}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            } else {
-                Text(formatFileSize(video.sizeBytes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+        if (video.progressFraction in 0.01f..0.98f && !video.isWatched) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(3.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(Color.White.copy(alpha = 0.3f))
+            ) {
+                Box(Modifier.fillMaxWidth(video.progressFraction).fillMaxSize().background(MaterialTheme.colorScheme.primary))
             }
+        }
+
+        if (video.isWatched) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .size(18.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiaryContainer, modifier = Modifier.size(12.dp))
+            }
+        } else if (video.lastPositionMs == 0L) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 6.dp, vertical = 1.dp)
+            ) {
+                Text("NEW", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSecondaryContainer)
+            }
+        }
+        Row(
+            modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onToggleFavorite, modifier = Modifier.size(28.dp)) {
+                Icon(
+                    imageVector = if (video.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+                    contentDescription = "Favorite",
+                    tint = if (video.isFavorite) MaterialTheme.colorScheme.primary else Color.White,
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+            VideoOverflowMenu(
+                video = video,
+                onToggleWatched = onToggleWatched,
+                onClearProgress = onClearProgress,
+                onAddToPlaylist = onAddToPlaylist,
+                tint = Color.White
+            )
         }
     }
 }
