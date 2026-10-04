@@ -29,7 +29,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -43,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.pteron.player.data.model.ViewMode
-import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.AppIcon
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.DarkModeButton
@@ -52,7 +50,7 @@ import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
 import com.pteron.player.ui.common.NoSearchResultsState
 import com.pteron.player.ui.common.PermissionRationaleState
-import com.pteron.player.ui.common.PteronBottomNavBar
+import com.pteron.player.ui.common.PteronWordmark
 import com.pteron.player.ui.common.SearchCard
 import com.pteron.player.ui.common.SectionTitle
 import com.pteron.player.ui.common.videoLibraryPermission
@@ -68,8 +66,7 @@ private val BottomNavClearance = 108.dp
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenFolder: (bucketId: String, name: String) -> Unit,
-    onOpenVideo: (videoId: Long, bucketId: String) -> Unit,
-    onNavigate: (BottomNavDestination) -> Unit
+    onOpenVideo: (videoId: Long, bucketId: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -111,13 +108,9 @@ fun LibraryScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppIcon(size = 30.dp)
+                        AppIcon(size = 36.dp)
                         Spacer(Modifier.size(10.dp))
-                        Text(
-                            "Pteron Player",
-                            style = MaterialTheme.typography.titleLarge,
-                            maxLines = 1
-                        )
+                        PteronWordmark(height = 38.dp)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CircularActionButton(
@@ -157,14 +150,6 @@ fun LibraryScreen(
                     )
                 }
             }
-
-            PteronBottomNavBar(
-                current = BottomNavDestination.LIBRARY,
-                onSelect = onNavigate,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 40.dp, vertical = 18.dp)
-            )
         }
     }
 }

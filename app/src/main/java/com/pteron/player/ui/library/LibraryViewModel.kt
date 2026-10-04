@@ -10,11 +10,18 @@ import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.PlaybackStateRepository
 import com.pteron.player.data.prefs.VideoPlaybackState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 enum class PermissionUiState { UNKNOWN, GRANTED, DENIED, PERMANENTLY_DENIED }
@@ -42,35 +49,51 @@ class LibraryViewModel(
     private val appearancePrefsRepository: AppearancePrefsRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(LibraryUiState())
-    val uiState: StateFlow<LibraryUiState> = _uiState.asStateFlow()
+    private data class Local(
+        val permission: PermissionUiState = PermissionUiState.UNKNOWN,
+        val isLoading: Boolean = false,
+        val errorMessage: String? = null,
+        val searchQuery: String = ""
+    )
 
-    private val _allVideos = MutableStateFlow<List<VideoItem>>(emptyList())
-    private val _allFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
+    private val local = MutableStateFlow(Local())
+    private val allVideos = MutableStateFlow<List<VideoItem>>(emptyList())
+    private val allFolders = MutableStateFlow<List<VideoFolder>>(emptyList())
+    private var loadJob: Job? = null
+
+    /**
+     * Built only while the Library is on screen. The "Continue Watching" list is derived from the
+     * whole library and the saved positions, which are rewritten every few seconds during playback;
+     * with the player open on top this used to be recomputed over and over for a screen nobody saw.
+     */
+    val uiState: StateFlow<LibraryUiState> = combine(
+        local, allFolders, allVideos, playbackStateRepository.allStates, appearancePrefsRepository.state
+    ) { l, folders, videos, states, appearance ->
+        LibraryUiState(
+            permission = l.permission,
+            isLoading = l.isLoading,
+            errorMessage = l.errorMessage,
+            allFolders = folders,
+            continueWatching = buildContinueWatching(videos, states),
+            searchQuery = l.searchQuery,
+            appearance = appearance
+        )
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), LibraryUiState())
+
+    @OptIn(FlowPreview::class)
+    private fun observeMediaChanges() {
+        viewModelScope.launch {
+            // A media scan can fire dozens of notifications in a burst; reload once it settles.
+            mediaStoreRepository.observeMediaChanges().debounce(500).collect {
+                if (local.value.permission == PermissionUiState.GRANTED) refresh()
+            }
+        }
+    }
 
     init {
-        viewModelScope.launch {
-            appearancePrefsRepository.state.collectLatest { appearance ->
-                _uiState.value = _uiState.value.copy(appearance = appearance)
-            }
-        }
-        viewModelScope.launch {
-            mediaStoreRepository.observeMediaChanges().collectLatest {
-                if (_uiState.value.permission == PermissionUiState.GRANTED) {
-                    refresh()
-                }
-            }
-        }
-        viewModelScope.launch {
-            combine(_allVideos, _allFolders, playbackStateRepository.allStates) { videos, folders, states ->
-                Triple(videos, folders, states)
-            }.collectLatest { (videos, folders, states) ->
-                _uiState.value = _uiState.value.copy(
-                    allFolders = folders,
-                    continueWatching = buildContinueWatching(videos, states)
-                )
-            }
-        }
+        observeMediaChanges()
     }
 
     fun onPermissionResult(granted: Boolean, canAskAgain: Boolean) {
@@ -79,22 +102,28 @@ class LibraryViewModel(
             !canAskAgain -> PermissionUiState.PERMANENTLY_DENIED
             else -> PermissionUiState.DENIED
         }
-        _uiState.value = _uiState.value.copy(permission = newState)
-        if (granted) refresh()
+        val alreadyLoaded = local.value.permission == PermissionUiState.GRANTED && allFolders.value.isNotEmpty()
+        local.update { it.copy(permission = newState) }
+        // Coming back to the Library tab re-reports the permission; the media observer keeps the
+        // data fresh, so don't rescan the whole device just because the tab was reopened.
+        if (granted && !alreadyLoaded) refresh()
     }
 
     fun refresh() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true, errorMessage = null)
+        // A newer refresh replaces one still running, instead of several full scans overlapping.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
+            local.update { it.copy(isLoading = true, errorMessage = null) }
             try {
-                _allFolders.value = mediaStoreRepository.loadFolders()
-                _allVideos.value = mediaStoreRepository.loadAllVideos()
-                _uiState.value = _uiState.value.copy(isLoading = false)
+                // One read of MediaStore: the folders are derived from the same rows as the videos.
+                val videos = mediaStoreRepository.loadAllVideos()
+                allFolders.value = mediaStoreRepository.foldersFrom(videos)
+                allVideos.value = videos
+                local.update { it.copy(isLoading = false) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (t: Throwable) {
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    errorMessage = t.message ?: "Couldn't read your video library."
-                )
+                local.update { it.copy(isLoading = false, errorMessage = t.message ?: "Couldn't read your video library.") }
             }
         }
     }
@@ -111,9 +140,7 @@ class LibraryViewModel(
             .take(10)
     }
 
-    fun onSearchQueryChange(query: String) {
-        _uiState.value = _uiState.value.copy(searchQuery = query)
-    }
+    fun onSearchQueryChange(query: String) = local.update { it.copy(searchQuery = query) }
 
     fun toggleDarkMode() {
         viewModelScope.launch { appearancePrefsRepository.toggleDarkMode() }
