@@ -30,12 +30,18 @@ enum class AppTheme(
     MINT("Mint", false, "#F8FBFA", "#EFF7F4", "#2F8F6E"),
     SKY("Sky", false, "#F8FBFD", "#F1F5FA", "#3E7FB8"),
     BLUSH("Blush", false, "#FDF9FA", "#FAF3F5", "#C15A7A"),
+    HONEY("Honey", false, "#FDFBF6", "#FAF5E8", "#B07A10"),
+    TEAL("Teal", false, "#F7FBFB", "#EEF6F6", "#1F7A7A"),
+    PLUM("Plum", false, "#FCF8FC", "#F7EFF6", "#8A3F7A"),
 
     ESPRESSO("Espresso", true, "#19120D", "#2A1D14", "#E8925E"),
     MIDNIGHT("Midnight", true, "#131314", "#1B2126", "#6FB3E8"),
     ONYX("Onyx", true, "#000000", "#261811", "#FF8F5A"),
     SLATE("Slate", true, "#141212", "#1C1D1F", "#7C93B3"),
-    FOREST("Forest", true, "#13130F", "#1B1F18", "#6FA87C");
+    FOREST("Forest", true, "#13130F", "#1B1F18", "#6FA87C"),
+    CRIMSON("Crimson", true, "#150E10", "#241619", "#E5707E"),
+    AUBERGINE("Aubergine", true, "#130F17", "#1F1727", "#B58CE8"),
+    LAGOON("Lagoon", true, "#0E1515", "#152325", "#4FC3BE");
 
     /** Background as an ARGB int, for the window background (drawn before Compose is ready). */
     val backgroundArgb: Int get() = android.graphics.Color.parseColor(backgroundHex)
