@@ -6,7 +6,13 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ContentTransform
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
@@ -94,7 +100,9 @@ import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.SettingsSet
 import com.pteron.player.ui.common.SettingsSetCard
 import com.pteron.player.ui.common.SettingsSetRow
-import com.pteron.player.ui.common.PteronBottomNavBar
+import com.pteron.player.ui.common.PteronClickableCard
+import com.pteron.player.ui.common.setItemShape
+import com.pteron.player.util.TabReselect
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
 import kotlin.math.roundToInt
@@ -111,6 +119,8 @@ private enum class SettingsSection(val title: String, val subtitle: String, val 
     AUDIO_SUBTITLES("Audio & subtitles", "Volume boost and subtitle size", Icons.Outlined.GraphicEq),
     DATA("Data & reset", "Watch history and default settings", Icons.Outlined.Storage)
 }
+
+private const val ThemesPerRow = 4
 
 private val lightThemes = AppTheme.entries.filter { !it.isDark }
 private val darkThemes = AppTheme.entries.filter { it.isDark }
@@ -129,7 +139,7 @@ private fun settingsTransition(opening: Boolean): ContentTransform {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestination) -> Unit) {
+fun SettingsScreen(viewModel: SettingsViewModel) {
     val appearance by viewModel.appearance.collectAsState()
     val playbackPrefs by viewModel.playbackPrefs.collectAsState()
 
@@ -138,6 +148,11 @@ fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestinati
     val openSection = openSectionName?.let { name -> SettingsSection.entries.firstOrNull { it.name == name } }
 
     BackHandler(enabled = openSection != null) { openSectionName = null }
+
+    // Tapping the Settings tab while already on it steps back out to the header list.
+    LaunchedEffect(Unit) {
+        TabReselect.events.collect { if (it == BottomNavDestination.SETTINGS) openSectionName = null }
+    }
 
     Scaffold { insets ->
         Box(
@@ -190,17 +205,6 @@ fun SettingsScreen(viewModel: SettingsViewModel, onNavigate: (BottomNavDestinati
                     }
                 }
             }
-
-            PteronBottomNavBar(
-                current = BottomNavDestination.SETTINGS,
-                // Tapping the tab you're already on steps back out to the header list.
-                onSelect = { destination ->
-                    if (destination == BottomNavDestination.SETTINGS) openSectionName = null else onNavigate(destination)
-                },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 40.dp, vertical = 18.dp)
-            )
         }
     }
 }
@@ -264,10 +268,9 @@ private fun SettingsSectionContent(
     SettingsPage {
         when (section) {
             SettingsSection.APPEARANCE -> {
-                LabeledGroup("Light themes") { ThemeGrid(lightThemes, appearance.theme, viewModel::setTheme) }
-                LabeledGroup("Dark themes") { ThemeGrid(darkThemes, appearance.theme, viewModel::setTheme) }
+                ThemeSection(appearance.theme, viewModel::setTheme)
                 LabeledGroup("Shades") { ShadeCard(appearance, viewModel) }
-                LabeledGroup("Font") { FontSet(appearance.font, viewModel::setFont) }
+                FontCard(appearance.font, viewModel::setFont)
             }
             SettingsSection.LIBRARY -> {
                 FolderAppearanceCard(appearance, viewModel)
@@ -309,9 +312,9 @@ private fun LabeledGroup(label: String, content: @Composable () -> Unit) {
 
 @Composable
 private fun ThemeGrid(themes: List<AppTheme>, selected: AppTheme, onSelect: (AppTheme) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        themes.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        themes.chunked(ThemesPerRow).forEach { row ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { theme ->
                     ThemePreviewCard(
                         theme = theme,
@@ -320,7 +323,7 @@ private fun ThemeGrid(themes: List<AppTheme>, selected: AppTheme, onSelect: (App
                         modifier = Modifier.weight(1f)
                     )
                 }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+                repeat(ThemesPerRow - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -339,12 +342,12 @@ private fun ThemePreviewCard(
     modifier: Modifier = Modifier
 ) {
     val colors = remember(theme) { theme.colors() }
-    val shape = RoundedCornerShape(14.dp)
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(3.dp)) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(1.05f)
+                .aspectRatio(0.95f)
                 .border(
                     width = if (selected) 2.5.dp else 1.dp,
                     color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
@@ -447,40 +450,167 @@ private fun ShadeSlider(title: String, value: Float, onCommit: (Float) -> Unit) 
     )
 }
 
-/** One card per font, each previewed in its own typeface; the chosen one takes the accent shade. */
+/**
+ * A collapsed "Theme" card showing the current theme. Tapping it unfolds the light and dark theme
+ * pickers right underneath (four small previews per row); tapping again folds them away. Nothing
+ * inside is composed while it is folded, so the Appearance page opens quickly.
+ */
 @Composable
-private fun FontSet(selected: AppFont, onSelect: (AppFont) -> Unit) {
-    val fonts = AppFont.entries
-    SettingsSet(count = fonts.size) { index, shape ->
-        val font = fonts[index]
-        val isSelected = font == selected
-        val scheme = MaterialTheme.colorScheme
-        val content = if (isSelected) scheme.onPrimary else scheme.onSurface
-        SettingsSetCard(
-            shape = shape,
-            onClick = { onSelect(font) },
-            color = if (isSelected) scheme.primary else scheme.surfaceContainer
-        ) {
+private fun ThemeSection(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val chevron by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "themeChevron"
+    )
+    Column {
+        SettingsSetCard(shape = setItemShape(0, 1), onClick = { expanded = !expanded }) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                ThemeSwatch(selected)
                 Column(modifier = Modifier.weight(1f)) {
+                    Text("Theme", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        font.displayName,
-                        style = MaterialTheme.typography.titleSmall.copy(fontFamily = font.fontFamily()),
-                        color = content
-                    )
-                    Text(
-                        "The quick brown fox jumps over 0123456789",
-                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = font.fontFamily()),
-                        color = content.copy(alpha = 0.75f),
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        selected.displayName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1
                     )
                 }
-                if (isSelected) {
-                    Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(20.dp))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = if (expanded) "Hide themes" else "Show themes",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = chevron }
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column(modifier = Modifier.padding(top = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                LabeledGroup("Light themes") { ThemeGrid(lightThemes, selected, onSelect) }
+                LabeledGroup("Dark themes") { ThemeGrid(darkThemes, selected, onSelect) }
+            }
+        }
+    }
+}
+
+/** The round icon bubble of the Theme card: a miniature of the current theme's three shades. */
+@Composable
+private fun ThemeSwatch(theme: AppTheme) {
+    val colors = remember(theme) { theme.colors() }
+    Canvas(
+        modifier = Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
+    ) {
+        drawRect(colors.background)
+        drawRect(colors.card, topLeft = Offset(0f, size.height * 0.55f), size = Size(size.width, size.height * 0.45f))
+        drawCircle(colors.accent, radius = size.minDimension * 0.17f, center = Offset(size.width / 2f, size.height * 0.38f))
+    }
+}
+
+/** A "Font" card showing the current font in its own typeface; tapping opens the picker sheet. */
+@Composable
+private fun FontCard(selected: AppFont, onSelect: (AppFont) -> Unit) {
+    var showSheet by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    SettingsSetCard(shape = setItemShape(0, 1), onClick = { showSheet = true }) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(scheme.primary),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "Aa",
+                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = selected.fontFamily()),
+                    color = scheme.onPrimary
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Font", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    selected.displayName,
+                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = selected.fontFamily()),
+                    color = scheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                contentDescription = null,
+                tint = scheme.onSurfaceVariant
+            )
+        }
+    }
+    if (showSheet) {
+        FontSheet(
+            selected = selected,
+            onSelect = {
+                onSelect(it)
+                showSheet = false
+            },
+            onDismiss = { showSheet = false }
+        )
+    }
+}
+
+/** Bottom sheet with one pill-shaped card per font, each in its own typeface; the chosen one takes the accent shade. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FontSheet(selected: AppFont, onSelect: (AppFont) -> Unit, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Font",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            )
+            AppFont.entries.forEach { font ->
+                val isSelected = font == selected
+                val content = if (isSelected) scheme.onPrimary else scheme.onSurface
+                PteronClickableCard(
+                    onClick = { onSelect(font) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(percent = 50),
+                    color = if (isSelected) scheme.primary else scheme.surfaceContainer,
+                    borderColor = if (isSelected) androidx.compose.ui.graphics.Color.Transparent
+                    else scheme.outlineVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            font.displayName,
+                            style = MaterialTheme.typography.titleSmall.copy(fontFamily = font.fontFamily()),
+                            color = content,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(20.dp))
+                        }
+                    }
                 }
             }
         }
