@@ -80,6 +80,7 @@ class MediaStoreRepository(private val context: Context) {
                 val idCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
                 val nameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
                 val bucketIdCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_ID)
+                val bucketNameCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
                 val durationCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
                 val sizeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
                 val dateCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_ADDED)
@@ -95,6 +96,7 @@ class MediaStoreRepository(private val context: Context) {
                         contentUri = uri.toString(),
                         displayName = cursor.getString(nameCol) ?: "Untitled",
                         bucketId = cursor.getString(bucketIdCol) ?: "unknown",
+                        bucketName = cursor.getString(bucketNameCol).orEmpty(),
                         durationMs = cursor.getLong(durationCol),
                         sizeBytes = cursor.getLong(sizeCol),
                         dateAddedSeconds = cursor.getLong(dateCol),
@@ -108,10 +110,16 @@ class MediaStoreRepository(private val context: Context) {
         }
 
     /** Groups [loadAllVideos] results into folders, mirroring the device's real bucket structure. */
-    suspend fun loadFolders(): List<VideoFolder> = withContext(Dispatchers.IO) {
-        val videos = loadAllVideos()
+    suspend fun loadFolders(): List<VideoFolder> = foldersFrom(loadAllVideos())
+
+    /**
+     * Builds the folder list from videos that are already loaded, so a screen that needs both the
+     * videos and the folders reads MediaStore once instead of twice. The folder name comes from the
+     * same rows (no extra query per folder, as there used to be).
+     */
+    suspend fun foldersFrom(videos: List<VideoItem>): List<VideoFolder> = withContext(Dispatchers.Default) {
         videos.groupBy { it.bucketId }.map { (bucketId, items) ->
-            val name = bucketDisplayName(bucketId) ?: items.first().displayName.substringBeforeLast('.')
+            val name = items.first().bucketName.ifBlank { items.first().displayName.substringBeforeLast('.') }
             VideoFolder(
                 bucketId = bucketId,
                 name = name,
@@ -121,22 +129,6 @@ class MediaStoreRepository(private val context: Context) {
                 mostRecentDateAddedSeconds = items.maxOf { it.dateAddedSeconds }
             )
         }.sortedByDescending { it.mostRecentDateAddedSeconds }
-    }
-
-    private fun bucketDisplayName(bucketId: String): String? {
-        var name: String? = null
-        context.contentResolver.query(
-            MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-            arrayOf(MediaStore.Video.Media.BUCKET_DISPLAY_NAME),
-            "${MediaStore.Video.Media.BUCKET_ID} = ?",
-            arrayOf(bucketId),
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                name = cursor.getString(0)
-            }
-        }
-        return name
     }
 
     /**

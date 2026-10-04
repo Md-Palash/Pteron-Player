@@ -2,11 +2,11 @@ package com.pteron.player.data.media
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.util.Size
 import coil.ImageLoader
 import coil.decode.DataSource
@@ -17,7 +17,6 @@ import coil.request.Options
 import coil.size.Dimension
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.ByteArrayOutputStream
 
 /**
  * Loads a lightweight thumbnail for a `content://` video Uri.
@@ -46,17 +45,10 @@ class VideoThumbnailFetcher(
             ?: loadRetrieverFrame()
             ?: throw IllegalStateException("No thumbnail available for $uri")
 
-        val bytes = ByteArrayOutputStream().use { stream ->
-            bitmap.compress(Bitmap.CompressFormat.JPEG, 90, stream)
-            stream.toByteArray()
-        }
-        bitmap.recycle()
-
+        // The bitmap is handed to Coil as it is. (It used to be compressed to JPEG and decoded again,
+        // which cost CPU, a transient copy of the picture and a little quality for no benefit.)
         DrawableResult(
-            drawable = BitmapDrawable(
-                context.resources,
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            ),
+            drawable = BitmapDrawable(context.resources, bitmap),
             isSampled = true,
             dataSource = DataSource.DISK
         )
@@ -83,10 +75,12 @@ class VideoThumbnailFetcher(
 
     class Factory(private val context: Context) : Fetcher.Factory<Uri> {
         override fun create(data: Uri, options: Options, imageLoader: ImageLoader): Fetcher? {
-            val authority = data.authority ?: return null
-            val isVideoContent = authority.contains("media") &&
-                context.contentResolver.getType(data)?.startsWith("video/") == true
-            return if (isVideoContent) VideoThumbnailFetcher(context, data, options) else null
+            // Decided from the Uri alone: asking the ContentResolver for the type is a cross-process
+            // call, and this runs for every image request. MediaStore video Uris look like
+            // content://media/<volume>/video/media/<id>.
+            if (data.scheme != "content" || data.authority != MediaStore.AUTHORITY) return null
+            val isVideo = data.pathSegments.contains("video")
+            return if (isVideo) VideoThumbnailFetcher(context, data, options) else null
         }
     }
 }
