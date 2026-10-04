@@ -33,14 +33,12 @@ import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.data.model.ViewMode
 import com.pteron.player.ui.playlists.AddToPlaylistSheet
-import com.pteron.player.navigation.BottomNavDestination
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.EmptyLibraryState
 import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
 import com.pteron.player.ui.common.NoSearchResultsState
-import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.ui.common.TopBarSortButton
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.VideoListHeader
@@ -53,8 +51,7 @@ private val BottomNavClearance = 108.dp
 @Composable
 fun VideosScreen(
     viewModel: VideosViewModel,
-    onOpenVideo: (videoId: Long, bucketId: String) -> Unit,
-    onNavigate: (BottomNavDestination) -> Unit
+    onOpenVideo: (videoId: Long, bucketId: String) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     // `visibleVideos` filters and sorts the whole list on every read, so compute it once per state.
@@ -146,14 +143,6 @@ fun VideosScreen(
                     }
                 }
             }
-
-            PteronBottomNavBar(
-                current = BottomNavDestination.VIDEOS,
-                onSelect = onNavigate,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 40.dp, vertical = 18.dp)
-            )
         }
     }
 }
