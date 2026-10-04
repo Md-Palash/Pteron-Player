@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Feather + play mark, scaled to sit inside the adaptive icon's 66dp safe zone. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="0.3" android:scaleY="0.3" android:translateX="-26.7" android:translateY="-26.4">
-        <group android:translateX="4" android:translateY="4">
+<!-- The Pteron player logo (full rounded tile), used in the Library header. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="64dp" android:height="64dp" android:viewportWidth="512" android:viewportHeight="512">
+    <path android:pathData="M112,0 H400 A112,112 0 0 1 512,112 V400 A112,112 0 0 1 400,512 H112 A112,112 0 0 1 0,400 V112 A112,112 0 0 1 112,0 Z"><aapt:attr name="android:fillColor"><gradient android:type="radial" android:centerX="153.6" android:centerY="102.4" android:gradientRadius="435.2"><item android:offset="0" android:color="#FFFFFF" /><item android:offset="0.65" android:color="#FAF5EE" /><item android:offset="1" android:color="#EFE6DA" /></gradient></aapt:attr></path>
+    <path android:fillColor="#00000000" android:strokeColor="#D8C8B6" android:strokeAlpha="0.55" android:strokeWidth="1.5"
+        android:pathData="M112,2 H400 A110,110 0 0 1 510,112 V400 A110,110 0 0 1 400,510 H112 A110,110 0 0 1 2,400 V112 A110,110 0 0 1 112,2 Z" />
+    <group android:translateX="4" android:translateY="4">
         <path android:fillColor="#E8DDD0" android:fillAlpha="0.45" android:pathData="M165,252 a100,70 0 1,0 200,0 a100,70 0 1,0 -200,0" />
         <path android:pathData="M172,320 C178,240 222,150 310,178 C335,186 355,210 350,240 C328,245 235,250 172,320 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="172" android:startY="150" android:endX="355" android:endY="320"><item android:offset="0" android:color="#2D1F17" /><item android:offset="0.6" android:color="#3E2D23" /><item android:offset="1" android:color="#553F32" /></gradient></aapt:attr></path>
         <path android:fillAlpha="0.88" android:pathData="M195,320 C235,342 280,325 305,285 C275,275 225,285 195,320 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="195" android:startY="285" android:endX="305" android:endY="342"><item android:offset="0" android:color="#D69B68" /><item android:offset="1" android:color="#B87D4E" /></gradient></aapt:attr></path>
         <path android:fillColor="#00000000" android:strokeColor="#FAF5EE" android:strokeWidth="5" android:strokeLineCap="round" android:pathData="M160,350 C190,320 230,260 345,250" />
         <path android:pathData="M235,205 L295,242 L235,279 Z"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="235" android:startY="205" android:endX="295" android:endY="279"><item android:offset="0" android:color="#E57A44" /><item android:offset="1" android:color="#B85122" /></gradient></aapt:attr></path>
         <path android:fillColor="#D26938" android:pathData="M359.5,235 a5.5,5.5 0 1,0 11,0 a5.5,5.5 0 1,0 -11,0" />
-        </group>
     </group>
 </vector>

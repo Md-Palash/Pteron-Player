@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The emerald "o" ring and the feather quill of the Pteron wordmark (same viewport as ic_wordmark_text). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="320dp"
+    android:height="156dp"
+    android:viewportWidth="320"
+    android:viewportHeight="156">
+
+    <!-- The ring that forms the "o" -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#00B88A"
+        android:strokeWidth="13"
+        android:pathData="M170.5,121.5 a24.5,24.5 0 1,0 49.0,0 a24.5,24.5 0 1,0 -49.0,0" />
+    <path
+        android:fillColor="#00B88A"
+        android:fillAlpha="0.35"
+        android:pathData="M192,121.5 a3,3 0 1,0 6,0 a3,3 0 1,0 -6,0" />
+
+    <group android:translateX="-37" android:translateY="151.5">
+        <!-- shaft -->
+        <path android:fillColor="#00000000" android:strokeColor="#00825E" android:strokeWidth="3.5" android:strokeLineCap="round"
+            android:pathData="M314,-148 C302,-100 274,-62 235,-31" />
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeAlpha="0.9" android:strokeWidth="1.8" android:strokeLineCap="round"
+            android:pathData="M312,-146 C300,-98 273,-62 236,-32" />
+        <!-- right vane -->
+        <path android:pathData="M314,-148 C342,-132 350,-105 328,-88 C344,-82 336,-62 314,-50 C298,-41 270,-35 244,-31 C238,-30 236,-32 242,-35 C264,-44 286,-70 300,-102 C308,-124 312,-140 314,-148 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="236" android:startY="-148" android:endX="350" android:endY="-30">
+                    <item android:offset="0" android:color="#00E5AA" />
+                    <item android:offset="0.45" android:color="#00B88A" />
+                    <item android:offset="1" android:color="#00825E" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- left vane -->
+        <path android:fillColor="#009A72"
+            android:pathData="M314,-148 C294,-134 278,-105 268,-82 C260,-66 250,-50 238,-32 C246,-42 262,-72 278,-98 C292,-120 304,-138 314,-148 Z" />
+        <!-- cyan accent barb -->
+        <path android:pathData="M326,-90 C342,-82 334,-62 310,-50 C320,-64 328,-78 326,-90 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="310" android:startY="-90" android:endX="338" android:endY="-50">
+                    <item android:offset="0" android:color="#38B6FF" />
+                    <item android:offset="1" android:color="#0066FF" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <!-- barb detail lines -->
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeAlpha="0.75" android:strokeWidth="1.4" android:strokeLineCap="round"
+            android:pathData="M304,-124 C322,-115 330,-105 324,-92" />
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeAlpha="0.75" android:strokeWidth="1.4" android:strokeLineCap="round"
+            android:pathData="M290,-98 C306,-88 316,-76 308,-60" />
+        <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeAlpha="0.75" android:strokeWidth="1.4" android:strokeLineCap="round"
+            android:pathData="M274,-72 C286,-64 296,-54 290,-44" />
+        <!-- nib -->
+        <path android:fillColor="#0F172A" android:pathData="M244,-36 L232,-30 L241,-24 Z" />
+        <path android:fillColor="#0F172A" android:pathData="M229.5,-30 a2.5,2.5 0 1,0 5,0 a2.5,2.5 0 1,0 -5,0" />
+    </group>
+</vector>
