@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
@@ -66,6 +68,7 @@ private const val TAB_ARTIST = 3
 private const val TAB_FAVORITE = 4
 
 /** Room under scrolling content for the floating nav pill (and, when a song is loaded, the mini player). */
+private val TopButtonSize = 48.dp
 private val NavClearance = 108.dp
 private val NavAndMiniClearance = 184.dp
 
@@ -127,9 +130,9 @@ fun AudioScreen(
                     TwoLineTitle(subtitle = "PTERON PLAYER", title = "Music")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (tab == TAB_PLAYLIST) {
-                            CircularActionButton(Icons.Outlined.Add, "New playlist", onClick = { showCreate = true })
+                            CircularActionButton(Icons.Outlined.Add, "New playlist", onClick = { showCreate = true }, size = TopButtonSize)
                         }
-                        DarkModeButton(onClick = viewModel::toggleDarkMode)
+                        DarkModeButton(onClick = viewModel::toggleDarkMode, size = TopButtonSize)
                     }
                 }
 
@@ -166,7 +169,8 @@ fun AudioScreen(
                     else -> {
                         AudioTabRow(TabLabels, tab) { tab = it }
                         Spacer(Modifier.height(12.dp))
-                        when (tab) {
+                        Crossfade(targetState = tab, modifier = Modifier.fillMaxSize(), animationSpec = tween(200), label = "audioTabContent") { currentTab ->
+                        when (currentTab) {
                             TAB_HOME -> AudioHome(
                                 state = state,
                                 bottomPadding = bottomClearance,
@@ -193,6 +197,7 @@ fun AudioScreen(
                             TAB_PLAYLIST -> PlaylistGrid(state, bottomClearance, onOpenPlaylist)
                             TAB_ARTIST -> ArtistGrid(state, bottomClearance, onOpenArtist)
                         }
+                        }
                     }
                 }
             }
@@ -200,7 +205,7 @@ fun AudioScreen(
             MiniPlayer(
                 controller = controller,
                 onOpen = onOpenNowPlaying,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 16.dp).padding(bottom = 92.dp)
+                modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 8.dp).padding(bottom = 92.dp)
             )
         }
     }

@@ -36,6 +36,8 @@ import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.SkipNext
+import androidx.compose.material.icons.rounded.FastForward
+import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -213,16 +215,20 @@ fun SongListRow(
 
 // --- Headings, tabs, rows ---------------------------------------------------------------------
 
+private val AudioHeaderHeight = 52.dp
+
 /** A bold, moderately large heading with a thin separator line under it. */
 @Composable
 fun AudioSectionHeader(title: String, modifier: Modifier = Modifier, onSeeAll: (() -> Unit)? = null) {
     Column(modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        // A fixed row height: the "See all" button is taller than a bare heading, which used to
+        // leave the gap above the separator different from section to section.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(AudioHeaderHeight),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            Text(title, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
             if (onSeeAll != null) TextButton(onClick = onSeeAll) { Text("See all") }
         }
         HorizontalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
@@ -299,43 +305,95 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
 
 // --- Mini player ------------------------------------------------------------------------------
 
-/** A pill above the bottom bar: cover, title, play / pause and next. Tapping it opens Now Playing. */
+/**
+ * A wide rounded rectangle above the bottom bar: a rounded-square cover on the left, the title in
+ * the middle and round previous / play-pause / next buttons on the right. Play-pause is the biggest
+ * and the darkest (accent) one; previous and next are smaller and in a lighter tint of it.
+ * Tapping the card opens Now Playing.
+ */
 @Composable
 fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     val song = state.current ?: return
+    val scheme = MaterialTheme.colorScheme
     PteronClickableCard(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(percent = 50),
-        color = MaterialTheme.colorScheme.surfaceContainerHighest
+        shape = RoundedCornerShape(30.dp),
+        color = scheme.surfaceContainerHighest
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 4.dp, top = 6.dp, bottom = 6.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            AudioArt(song.contentUri, Modifier.size(44.dp).clip(CircleShape), iconSize = 22.dp)
+            AudioArt(song.contentUri, Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)), iconSize = 24.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(song.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
                     song.artist,
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = scheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            IconButton(onClick = controller::togglePlayPause) {
-                Icon(
-                    imageVector = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (state.isPlaying) "Pause" else "Play"
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MiniRoundButton(
+                    icon = Icons.Rounded.FastRewind,
+                    description = "Previous",
+                    size = 38.dp,
+                    container = scheme.primary.copy(alpha = 0.16f),
+                    tint = scheme.primary,
+                    enabled = state.hasPrevious,
+                    onClick = controller::previous
+                )
+                MiniRoundButton(
+                    icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    description = if (state.isPlaying) "Pause" else "Play",
+                    size = 50.dp,
+                    container = scheme.primary,
+                    tint = scheme.onPrimary,
+                    onClick = controller::togglePlayPause
+                )
+                MiniRoundButton(
+                    icon = Icons.Rounded.FastForward,
+                    description = "Next",
+                    size = 38.dp,
+                    container = scheme.primary.copy(alpha = 0.16f),
+                    tint = scheme.primary,
+                    enabled = state.hasNext,
+                    onClick = controller::next
                 )
             }
-            IconButton(onClick = controller::next, enabled = state.hasNext) {
-                Icon(Icons.Outlined.SkipNext, contentDescription = "Next")
-            }
         }
+    }
+}
+
+@Composable
+private fun MiniRoundButton(
+    icon: ImageVector,
+    description: String,
+    size: Dp,
+    container: Color,
+    tint: Color,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(container)
+            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = description,
+            tint = if (enabled) tint else tint.copy(alpha = 0.35f),
+            modifier = Modifier.size(size * 0.5f)
+        )
     }
 }
 
