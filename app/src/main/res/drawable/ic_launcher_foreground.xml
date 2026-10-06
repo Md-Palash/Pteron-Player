@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Camera / play mark, scaled to sit inside the adaptive icon's 66dp safe zone. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:pivotX="256" android:pivotY="243" android:scaleX="0.4" android:scaleY="0.4" android:translateX="-202" android:translateY="-189">
+    <group android:pivotX="256" android:pivotY="243" android:scaleX="0.4" android:scaleY="0.4" android:translateX="-200.5" android:translateY="-189">
         <group android:translateX="-3.5" android:translateY="11">
 <path android:pathData="M203,205 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="203" android:startY="184" android:endX="245" android:endY="226"><item android:offset="0" android:color="#342217" /><item android:offset="1" android:color="#1E120A" /></gradient></aapt:attr></path>
 <path android:fillColor="#FAF5EE" android:pathData="M215.5,205 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0" />

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The Pteron player logo (rounded tile with the camera / play mark), used in the Library header. -->
+<!-- The Pteron player logo (round badge with the camera / play mark), used in the Library header. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="64dp" android:height="64dp" android:viewportWidth="512" android:viewportHeight="512">
-    <path android:fillColor="#FAF5EE" android:pathData="M112,0 H400 A112,112 0 0 1 512,112 V400 A112,112 0 0 1 400,512 H112 A112,112 0 0 1 0,400 V112 A112,112 0 0 1 112,0 Z" />
+    <path android:fillColor="#FAF5EE" android:pathData="M0,256 a256,256 0 1,0 512,0 a256,256 0 1,0 -512,0" />
     <path android:fillColor="#00000000" android:strokeColor="#D8C8B6" android:strokeAlpha="0.55" android:strokeWidth="1.5"
-        android:pathData="M112,2 H400 A110,110 0 0 1 510,112 V400 A110,110 0 0 1 400,510 H112 A110,110 0 0 1 2,400 V112 A110,110 0 0 1 112,2 Z" />
-    <group android:pivotX="256" android:pivotY="243" android:scaleX="2.2" android:scaleY="2.2" android:translateY="13">
+        android:pathData="M2,256 a254,254 0 1,0 508,0 a254,254 0 1,0 -508,0" />
+    <group android:pivotX="256" android:pivotY="243" android:scaleX="3.0" android:scaleY="3.0" android:translateY="10">
         <group android:translateX="-3.5" android:translateY="11">
 <path android:pathData="M203,205 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0"><aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="203" android:startY="184" android:endX="245" android:endY="226"><item android:offset="0" android:color="#342217" /><item android:offset="1" android:color="#1E120A" /></gradient></aapt:attr></path>
 <path android:fillColor="#FAF5EE" android:pathData="M215.5,205 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0" />
