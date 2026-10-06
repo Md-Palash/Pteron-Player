@@ -6,11 +6,18 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 private val Context.musicPrefsDataStore by preferencesDataStore(name = "music_prefs")
+
+/** Look of the full-screen Now Playing card. */
+enum class NowPlayingStyle(val displayName: String) {
+    CIRCLE("Circular"),
+    SQUARE("Square")
+}
 
 data class MusicPrefsState(
     /** Skips silent stretches inside a track. */
@@ -27,7 +34,8 @@ data class MusicPrefsState(
     val pauseOnHeadphonesUnplugged: Boolean = true,
     val keepScreenOnInNowPlaying: Boolean = false,
     /** Jump to the Now Playing screen as soon as a song is started from a list. */
-    val openNowPlayingOnPlay: Boolean = false
+    val openNowPlayingOnPlay: Boolean = false,
+    val nowPlayingStyle: NowPlayingStyle = NowPlayingStyle.CIRCLE
 )
 
 /** Settings > Music Player. Each control reads and writes a real key that the audio player applies. */
@@ -43,6 +51,7 @@ class MusicPrefsRepository(private val context: Context) {
         val PAUSE_ON_UNPLUG = booleanPreferencesKey("pause_on_headphones_unplugged")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on_now_playing")
         val OPEN_NOW_PLAYING = booleanPreferencesKey("open_now_playing_on_play")
+        val NOW_PLAYING_STYLE = stringPreferencesKey("now_playing_style")
     }
 
     val state: Flow<MusicPrefsState> = context.musicPrefsDataStore.data.map { p ->
@@ -55,7 +64,10 @@ class MusicPrefsRepository(private val context: Context) {
             minTrackSeconds = p[Keys.MIN_TRACK_SECONDS] ?: 30,
             pauseOnHeadphonesUnplugged = p[Keys.PAUSE_ON_UNPLUG] ?: true,
             keepScreenOnInNowPlaying = p[Keys.KEEP_SCREEN_ON] ?: false,
-            openNowPlayingOnPlay = p[Keys.OPEN_NOW_PLAYING] ?: false
+            openNowPlayingOnPlay = p[Keys.OPEN_NOW_PLAYING] ?: false,
+            nowPlayingStyle = runCatching {
+                NowPlayingStyle.valueOf(p[Keys.NOW_PLAYING_STYLE] ?: NowPlayingStyle.CIRCLE.name)
+            }.getOrDefault(NowPlayingStyle.CIRCLE)
         )
     }
 
@@ -68,6 +80,7 @@ class MusicPrefsRepository(private val context: Context) {
     suspend fun setPauseOnHeadphonesUnplugged(value: Boolean) = edit { it[Keys.PAUSE_ON_UNPLUG] = value }
     suspend fun setKeepScreenOnInNowPlaying(value: Boolean) = edit { it[Keys.KEEP_SCREEN_ON] = value }
     suspend fun setOpenNowPlayingOnPlay(value: Boolean) = edit { it[Keys.OPEN_NOW_PLAYING] = value }
+    suspend fun setNowPlayingStyle(style: NowPlayingStyle) = edit { it[Keys.NOW_PLAYING_STYLE] = style.name }
 
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         context.musicPrefsDataStore.edit(block)
