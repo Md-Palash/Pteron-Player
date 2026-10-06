@@ -10,3 +10,11 @@ val videoLibraryPermission: String
     } else {
         Manifest.permission.READ_EXTERNAL_STORAGE
     }
+
+/** Runtime permission for reading the device's audio files, resolved for the running OS version. */
+val audioLibraryPermission: String
+    get() = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        Manifest.permission.READ_MEDIA_AUDIO
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }

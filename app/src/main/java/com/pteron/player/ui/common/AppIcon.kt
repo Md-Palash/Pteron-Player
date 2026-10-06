@@ -1,7 +1,11 @@
 package com.pteron.player.ui.common
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.Alignment
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
@@ -51,6 +55,26 @@ fun PteronWordmark(modifier: Modifier = Modifier, height: Dp = 40.dp) {
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Fit
         )
+    }
+}
+
+/**
+ * The logo tile and the wordmark as one lockup. The wordmark drawable is 156 units tall but its
+ * letters only occupy the lower part (about y 85..149, centre at ~75% of the height), the rest is
+ * the feather rising above them. The wordmark is therefore lifted by 25% of its height so the
+ * centre of the letters lines up with the centre of the logo tile.
+ */
+@Composable
+fun PteronBrand(modifier: Modifier = Modifier) {
+    val logoSize = 40.dp
+    val wordmarkHeight = 48.dp
+    Row(
+        modifier = modifier,
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        AppIcon(size = logoSize)
+        PteronWordmark(modifier = Modifier.offset(y = -(wordmarkHeight * 0.25f)), height = wordmarkHeight)
     }
 }
 

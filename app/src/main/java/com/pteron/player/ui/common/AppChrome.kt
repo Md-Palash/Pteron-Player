@@ -15,12 +15,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VideoLibrary
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.PlaylistPlay
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.VideoLibrary
@@ -226,8 +228,8 @@ private fun NavPillItem(icon: ImageVector, label: String, selected: Boolean, onC
     )
     Box(
         modifier = Modifier
-            .padding(horizontal = 4.dp)
-            .size(48.dp)
+            .padding(horizontal = 3.dp)
+            .size(44.dp)
             .clip(CircleShape)
             .semantics { role = Role.Button }
             .bouncyClickable(onClick = onClick)
@@ -241,6 +243,7 @@ private fun NavPillItem(icon: ImageVector, label: String, selected: Boolean, onC
 private fun iconFor(destination: BottomNavDestination, selected: Boolean): ImageVector = when (destination) {
     BottomNavDestination.LIBRARY -> if (selected) Icons.Filled.Folder else Icons.Outlined.Folder
     BottomNavDestination.VIDEOS -> if (selected) Icons.Filled.VideoLibrary else Icons.Outlined.VideoLibrary
+    BottomNavDestination.AUDIO -> if (selected) Icons.Filled.MusicNote else Icons.Outlined.MusicNote
     BottomNavDestination.PLAYLISTS -> if (selected) Icons.Filled.PlaylistPlay else Icons.Outlined.PlaylistPlay
     BottomNavDestination.SETTINGS -> if (selected) Icons.Filled.Settings else Icons.Outlined.Settings
 }
