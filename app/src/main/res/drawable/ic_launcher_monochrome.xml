@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Single-color silhouette for Android 13+ themed icons. -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <group android:scaleX="0.3" android:scaleY="0.3" android:translateX="-26.7" android:translateY="-26.4">
-        <group android:translateX="4" android:translateY="4">
-            <path android:fillColor="#000000" android:fillType="evenOdd" android:pathData="M172,320 C178,240 222,150 310,178 C335,186 355,210 350,240 C328,245 235,250 172,320 Z M235,205 L295,242 L235,279 Z" />
-            <path android:fillColor="#000000" android:pathData="M195,320 C235,342 280,325 305,285 C275,275 225,285 195,320 Z" />
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <group android:pivotX="256" android:pivotY="243" android:scaleX="0.4" android:scaleY="0.4" android:translateX="-202" android:translateY="-189">
+        <group android:translateX="-3.5" android:translateY="11">
+            <path android:fillColor="#000000" android:fillType="evenOdd" android:pathData="M203,205 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 M215.5,205 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0 M234,205 a21,21 0 1,0 42,0 a21,21 0 1,0 -42,0 M246.5,205 a8.5,8.5 0 1,0 17,0 a8.5,8.5 0 1,0 -17,0" />
+            <path android:fillColor="#000000" android:fillType="evenOdd" android:pathData="M212,224 H250 A8,8 0 0 1 258,232 V271 A8,8 0 0 1 250,279 H212 A8,8 0 0 1 204,271 V232 A8,8 0 0 1 212,224 Z M232,251.5 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0" />
+            <path android:fillColor="#000000" android:pathData="M267,232 C267,228 271,226 274.5,228 L312,250 C315.5,252 315.5,256 312,258 L274.5,280 C271,282 267,280 267,276 Z" />
         </group>
     </group>
 </vector>
