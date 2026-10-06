@@ -24,6 +24,7 @@ import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.util.TabReselect
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
@@ -82,10 +83,17 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
  * these are short and the incoming screen waits a beat so the two never muddy each other.
  */
-private val tabEnter = fadeIn(tween(200, delayMillis = 50))
-private val tabExit = fadeOut(tween(110))
-private val tabPopEnter = fadeIn(tween(200, delayMillis = 50))
-private val tabPopExit = fadeOut(tween(110))
+// The incoming tab fades up from slightly smaller while the outgoing one fades quickly underneath,
+// so there is never an empty frame between the two (the old 50 ms delay showed the bare window).
+private val tabEnter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
+    scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.97f)
+private val tabExit = fadeOut(tween(120, easing = FastOutSlowInEasing))
+private val tabPopEnter = tabEnter
+private val tabPopExit = tabExit
+
+// The video surface cannot slide or fade with the rest of the screen, so a slide-out looked stuck.
+// Leaving the player is a short plain fade instead.
+private val playerPopExit = fadeOut(tween(120))
 
 private val pushEnter = slideInHorizontally(animationSpec = tween(280)) { it / 4 } + fadeIn(tween(220))
 private val pushExit = fadeOut(tween(160))
@@ -339,7 +347,7 @@ fun PteronNavGraph(
             enterTransition = { pushEnter },
             exitTransition = { pushExit },
             popEnterTransition = { popEnter },
-            popExitTransition = { popExit }
+            popExitTransition = { playerPopExit }
         ) { backStackEntry ->
             val videoId = backStackEntry.arguments?.getLong("videoId") ?: return@composable
             val bucketId = backStackEntry.arguments?.getString("bucketId").orEmpty()
@@ -361,7 +369,7 @@ fun PteronNavGraph(
             enterTransition = { pushEnter },
             exitTransition = { pushExit },
             popEnterTransition = { popEnter },
-            popExitTransition = { popExit }
+            popExitTransition = { playerPopExit }
         ) { backStackEntry ->
             val uri = backStackEntry.arguments?.getString("uri") ?: return@composable
             PlayerScreen(
