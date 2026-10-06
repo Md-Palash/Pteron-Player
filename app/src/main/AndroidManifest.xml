@@ -6,6 +6,7 @@
          is only requested (via maxSdkVersion) for older versions. No INTERNET
          permission is requested: Pteron Player is fully offline. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -62,6 +63,15 @@
 
         <service
             android:name=".playback.PlaybackSessionService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback">
+            <intent-filter>
+                <action android:name="androidx.media3.session.MediaSessionService" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".playback.AudioSessionService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
