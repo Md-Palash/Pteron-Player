@@ -5,6 +5,7 @@ import android.net.Uri
 sealed class Screen(val route: String) {
     data object Library : Screen("library")
     data object Videos : Screen("videos")
+    data object Audio : Screen("audio")
     data object Playlists : Screen("playlists")
     data object Settings : Screen("settings")
 
@@ -27,16 +28,27 @@ sealed class Screen(val route: String) {
         fun createRoute(playlistId: Long) = "playlist/$playlistId"
     }
 
+    data object AudioArtist : Screen("audio_artist/{artist}") {
+        fun createRoute(artist: String) = "audio_artist/${Uri.encode(artist)}"
+    }
+
+    data object AudioPlaylist : Screen("audio_playlist/{playlistId}") {
+        fun createRoute(playlistId: Long) = "audio_playlist/$playlistId"
+    }
+
+    data object NowPlaying : Screen("now_playing")
+
     /** A video opened from another app (file manager, browser, ...) via ACTION_VIEW. */
     data object ExternalPlayer : Screen("external/{uri}") {
         fun createRoute(uri: String) = "external/${Uri.encode(uri)}"
     }
 }
 
-/** The four destinations shown in the persistent bottom navigation bar. */
+/** The five destinations shown in the persistent bottom navigation bar. */
 enum class BottomNavDestination(val screen: Screen, val label: String) {
     LIBRARY(Screen.Library, "Library"),
     VIDEOS(Screen.Videos, "Videos"),
+    AUDIO(Screen.Audio, "Audio"),
     PLAYLISTS(Screen.Playlists, "Playlists"),
     SETTINGS(Screen.Settings, "Settings")
 }

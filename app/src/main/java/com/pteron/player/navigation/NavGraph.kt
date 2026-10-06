@@ -2,6 +2,7 @@ package com.pteron.player.navigation
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
@@ -38,6 +39,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.pteron.player.PteronApp
+import com.pteron.player.ui.audio.AudioArtistScreen
+import com.pteron.player.ui.audio.AudioPlaylistScreen
+import com.pteron.player.ui.audio.AudioScreen
+import com.pteron.player.ui.audio.AudioViewModel
+import com.pteron.player.ui.audio.NowPlayingScreen
 import com.pteron.player.ui.folder.FolderScreen
 import com.pteron.player.ui.folder.FolderViewModel
 import com.pteron.player.ui.library.LibraryScreen
@@ -83,8 +89,14 @@ private val tabPopExit = fadeOut(tween(110))
 
 private val pushEnter = slideInHorizontally(animationSpec = tween(280)) { it / 4 } + fadeIn(tween(220))
 private val pushExit = fadeOut(tween(160))
-private val popEnter = fadeIn(tween(200))
-private val popExit = slideOutHorizontally(animationSpec = tween(280)) { it / 4 } + fadeOut(tween(220))
+
+// Going back mirrors going forward: the screen being left slides out to the right while it fades,
+// and the screen underneath drifts in from the left (a short parallax) as it fades up, instead of
+// popping in with a bare fade. Same easing on both so the two motions read as one gesture.
+private val popEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 8 } +
+    fadeIn(tween(260, delayMillis = 40, easing = FastOutSlowInEasing))
+private val popExit = slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 3 } +
+    fadeOut(tween(220, easing = FastOutSlowInEasing))
 
 @UnstableApi
 @Composable
@@ -108,6 +120,14 @@ fun PteronNavGraph(
     onExternalVideoHandled: () -> Unit = {}
 ) {
     val navController = rememberNavController()
+
+    // One view model for the whole Audio section (tab, artist / playlist pages, Now Playing).
+    val audioViewModel: AudioViewModel = viewModel(
+        factory = AudioViewModel.Factory(
+            app.audioRepository, app.audioStateRepository, app.audioPlaylistRepository,
+            app.musicPrefsRepository, app.appearancePrefsRepository
+        )
+    )
 
     // One bottom bar for the whole app, above the navigation host. Previously every tab drew its own
     // copy, so switching tabs cross-faded two bars on top of each other (a visible flicker).
@@ -168,6 +188,65 @@ fun PteronNavGraph(
             )
         }
 
+        composable(Screen.Audio.route) {
+            AudioScreen(
+                viewModel = audioViewModel,
+                controller = app.audioController,
+                onOpenArtist = { navController.navigate(Screen.AudioArtist.createRoute(it)) },
+                onOpenPlaylist = { navController.navigate(Screen.AudioPlaylist.createRoute(it)) },
+                onOpenNowPlaying = { navController.navigate(Screen.NowPlaying.route) }
+            )
+        }
+
+        composable(
+            route = Screen.AudioArtist.route,
+            arguments = listOf(navArgument("artist") { type = NavType.StringType }),
+            enterTransition = { pushEnter },
+            exitTransition = { pushExit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) { backStackEntry ->
+            AudioArtistScreen(
+                viewModel = audioViewModel,
+                controller = app.audioController,
+                artist = backStackEntry.arguments?.getString("artist").orEmpty(),
+                onBack = navController::popBackStack,
+                onOpenNowPlaying = { navController.navigate(Screen.NowPlaying.route) }
+            )
+        }
+
+        composable(
+            route = Screen.AudioPlaylist.route,
+            arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
+            enterTransition = { pushEnter },
+            exitTransition = { pushExit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) { backStackEntry ->
+            val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
+            AudioPlaylistScreen(
+                viewModel = audioViewModel,
+                controller = app.audioController,
+                playlistId = playlistId,
+                onBack = navController::popBackStack,
+                onOpenNowPlaying = { navController.navigate(Screen.NowPlaying.route) }
+            )
+        }
+
+        composable(
+            route = Screen.NowPlaying.route,
+            enterTransition = { pushEnter },
+            exitTransition = { pushExit },
+            popEnterTransition = { popEnter },
+            popExitTransition = { popExit }
+        ) {
+            NowPlayingScreen(
+                controller = app.audioController,
+                viewModel = audioViewModel,
+                onBack = navController::popBackStack
+            )
+        }
+
         composable(Screen.Playlists.route) {
             val scope = rememberCoroutineScope()
             val viewModel: PlaylistsViewModel = viewModel(
@@ -190,7 +269,9 @@ fun PteronNavGraph(
         ) { backStackEntry ->
             val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
             val viewModel: PlaylistDetailViewModel = viewModel(
-                factory = PlaylistDetailViewModel.Factory(playlistId, app.playlistRepository, app.mediaStoreRepository)
+                factory = PlaylistDetailViewModel.Factory(
+                    playlistId, app.playlistRepository, app.mediaStoreRepository, app.playbackStateRepository
+                )
             )
             PlaylistDetailScreen(
                 viewModel = viewModel,
@@ -206,7 +287,8 @@ fun PteronNavGraph(
         composable(Screen.Settings.route) {
             val viewModel: SettingsViewModel = viewModel(
                 factory = SettingsViewModel.Factory(
-                    app.appearancePrefsRepository, app.playbackPrefsRepository, app.playbackStateRepository
+                    app.appearancePrefsRepository, app.playbackPrefsRepository, app.playbackStateRepository,
+                    app.musicPrefsRepository, app.audioStateRepository
                 )
             )
             SettingsScreen(viewModel = viewModel)
@@ -309,7 +391,7 @@ fun PteronNavGraph(
             },
             modifier = Modifier
                 .windowInsetsPadding(WindowInsets.navigationBars)
-                .padding(horizontal = 40.dp, vertical = 18.dp)
+                .padding(horizontal = 28.dp, vertical = 18.dp)
         )
     }
     }
