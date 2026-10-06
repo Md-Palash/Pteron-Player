@@ -129,7 +129,7 @@ fun FolderScreen(
                 visibleVideos.isEmpty() -> NoSearchResultsState()
                 else -> when (uiState.appearance.viewMode) {
                     ViewMode.GRID -> LazyVerticalGrid(
-                        columns = GridCells.Fixed(2),
+                        columns = GridCells.Fixed(uiState.appearance.videoGridColumns),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
@@ -142,7 +142,8 @@ fun FolderScreen(
                                 onToggleFavorite = { viewModel.toggleFavorite(video) },
                                 onToggleWatched = { viewModel.toggleWatched(video) },
                                 onClearProgress = { viewModel.clearProgress(video) },
-                                onAddToPlaylist = { playlistTarget = video }
+                                onAddToPlaylist = { playlistTarget = video },
+                                columns = uiState.appearance.videoGridColumns
                             )
                         }
                     }

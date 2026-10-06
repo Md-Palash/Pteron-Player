@@ -82,7 +82,9 @@ fun VideoListRow(
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Extra entries appended to the "..." menu (e.g. playlist actions); call dismiss to close it. */
+    extraMenuItems: (@Composable (dismiss: () -> Unit) -> Unit)? = null
 ) {
     Row(
         modifier = modifier
@@ -160,7 +162,8 @@ fun VideoListRow(
                     video = video,
                     onToggleWatched = onToggleWatched,
                     onClearProgress = onClearProgress,
-                    onAddToPlaylist = onAddToPlaylist
+                    onAddToPlaylist = onAddToPlaylist,
+                    extraMenuItems = extraMenuItems
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -226,10 +229,14 @@ fun VideoGridTile(
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** 2 (default) or 3 tiles per row; 3 switches to a more compact tile. */
+    columns: Int = 2
 ) {
+    val compact = columns >= 3
+    val buttonSize = if (compact) 24.dp else 28.dp
     // The thumbnail fills the whole card; the title and details sit on a bottom scrim above it.
-    Box(modifier = modifier.aspectRatio(GridTileAspect).videoCard(onClick)) {
+    Box(modifier = modifier.aspectRatio(if (compact) 1.05f else GridTileAspect).videoCard(onClick)) {
         ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
 
         // Bottom scrim: keeps the text readable on any thumbnail without a hard edge.
@@ -238,11 +245,11 @@ fun VideoGridTile(
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))))
-                .padding(start = 10.dp, end = 10.dp, top = 26.dp, bottom = 9.dp)
+                .padding(start = if (compact) 7.dp else 10.dp, end = if (compact) 7.dp else 10.dp, top = 26.dp, bottom = if (compact) 7.dp else 9.dp)
         ) {
             Text(
                 video.displayName,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (compact) MaterialTheme.typography.labelLarge else MaterialTheme.typography.titleSmall,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -252,18 +259,22 @@ fun VideoGridTile(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Text(
-                    text = if (video.lastPositionMs > 0L && !video.isWatched) {
-                        "Resume ${formatTimecode(video.lastPositionMs)} • ${formatPercent(video.progressFraction)}"
-                    } else {
-                        formatFileSize(video.sizeBytes)
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Color.White.copy(alpha = 0.85f),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
+                if (compact) {
+                    androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
+                } else {
+                    Text(
+                        text = if (video.lastPositionMs > 0L && !video.isWatched) {
+                            "Resume ${formatTimecode(video.lastPositionMs)} • ${formatPercent(video.progressFraction)}"
+                        } else {
+                            formatFileSize(video.sizeBytes)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(4.dp))
@@ -315,12 +326,12 @@ fun VideoGridTile(
             modifier = Modifier.align(Alignment.TopEnd).padding(2.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onToggleFavorite, modifier = Modifier.size(28.dp)) {
+            IconButton(onClick = onToggleFavorite, modifier = Modifier.size(buttonSize)) {
                 Icon(
                     imageVector = if (video.isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
                     contentDescription = "Favorite",
                     tint = if (video.isFavorite) MaterialTheme.colorScheme.primary else Color.White,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(if (compact) 14.dp else 15.dp)
                 )
             }
             VideoOverflowMenu(
@@ -328,7 +339,8 @@ fun VideoGridTile(
                 onToggleWatched = onToggleWatched,
                 onClearProgress = onClearProgress,
                 onAddToPlaylist = onAddToPlaylist,
-                tint = Color.White
+                tint = Color.White,
+                buttonSize = buttonSize
             )
         }
     }
@@ -342,11 +354,13 @@ private fun VideoOverflowMenu(
     onToggleWatched: () -> Unit,
     onClearProgress: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
-    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant
+    tint: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+    buttonSize: androidx.compose.ui.unit.Dp = 28.dp,
+    extraMenuItems: (@Composable (dismiss: () -> Unit) -> Unit)? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        IconButton(onClick = { expanded = true }, modifier = Modifier.size(28.dp)) {
+        IconButton(onClick = { expanded = true }, modifier = Modifier.size(buttonSize)) {
             Icon(
                 imageVector = Icons.Outlined.MoreVert,
                 contentDescription = "More options",
@@ -388,6 +402,7 @@ private fun VideoOverflowMenu(
                     }
                 )
             }
+            extraMenuItems?.invoke { expanded = false }
         }
     }
 }
