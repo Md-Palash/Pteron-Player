@@ -42,7 +42,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.pteron.player.data.model.ViewMode
-import com.pteron.player.ui.common.AppIcon
+import com.pteron.player.ui.common.PteronBrand
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.DarkModeButton
 import com.pteron.player.ui.common.EmptyLibraryState
@@ -50,7 +50,6 @@ import com.pteron.player.ui.common.ErrorState
 import com.pteron.player.ui.common.LoadingState
 import com.pteron.player.ui.common.NoSearchResultsState
 import com.pteron.player.ui.common.PermissionRationaleState
-import com.pteron.player.ui.common.PteronWordmark
 import com.pteron.player.ui.common.SearchCard
 import com.pteron.player.ui.common.SectionTitle
 import com.pteron.player.ui.common.videoLibraryPermission
@@ -107,11 +106,7 @@ fun LibraryScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AppIcon(size = 36.dp)
-                        Spacer(Modifier.size(10.dp))
-                        PteronWordmark(height = 38.dp)
-                    }
+                    PteronBrand()
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         CircularActionButton(
                             icon = if (effectiveViewMode == ViewMode.GRID) Icons.Outlined.ViewList else Icons.Outlined.GridView,
