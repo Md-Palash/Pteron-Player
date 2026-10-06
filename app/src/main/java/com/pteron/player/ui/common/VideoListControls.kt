@@ -147,7 +147,8 @@ fun TopBarSortButton(
     selectedOption: SortOption,
     direction: SortDirection,
     onSelect: (SortOption, SortDirection) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: androidx.compose.ui.unit.Dp = DefaultTopButtonSize
 ) {
     var expanded by remember { mutableStateOf(false) }
     val gapPx = with(LocalDensity.current) { 6.dp.roundToPx() }
@@ -157,7 +158,8 @@ fun TopBarSortButton(
         CircularActionButton(
             icon = Icons.Outlined.Sort,
             contentDescription = "Sort: ${selectedOption.label}",
-            onClick = { expanded = true }
+            onClick = { expanded = true },
+            size = size
         )
 
         if (expanded) {

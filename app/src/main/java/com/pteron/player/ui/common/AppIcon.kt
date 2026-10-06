@@ -66,12 +66,12 @@ fun PteronWordmark(modifier: Modifier = Modifier, height: Dp = 40.dp) {
  */
 @Composable
 fun PteronBrand(modifier: Modifier = Modifier) {
-    val logoSize = 40.dp
-    val wordmarkHeight = 48.dp
+    val logoSize = 44.dp
+    val wordmarkHeight = 34.dp
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         AppIcon(size = logoSize)
         PteronWordmark(modifier = Modifier.offset(y = -(wordmarkHeight * 0.25f)), height = wordmarkHeight)

@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.pteron.player.theme.LocalThemeColors
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -90,16 +91,20 @@ fun SectionTitle(
     }
 }
 
+/** Default diameter of the round buttons in a screen's top-right row. Screens can pass a bigger one. */
+val DefaultTopButtonSize = 40.dp
+
 @Composable
 private fun CircularButtonShell(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    size: Dp = DefaultTopButtonSize,
     content: @Composable () -> Unit
 ) {
     Box(
         modifier = modifier
-            .size(40.dp)
+            .size(size)
             .clip(CircleShape)
             .semantics {
                 role = Role.Button
@@ -122,14 +127,15 @@ fun CircularActionButton(
     icon: ImageVector,
     contentDescription: String,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    size: Dp = DefaultTopButtonSize
 ) {
-    CircularButtonShell(contentDescription, onClick, modifier) {
+    CircularButtonShell(contentDescription, onClick, modifier, size) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(size * 0.5f)
         )
     }
 }
@@ -140,7 +146,7 @@ fun CircularActionButton(
  * value, so the switch is a smooth swap rather than a cut.
  */
 @Composable
-fun DarkModeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun DarkModeButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = DefaultTopButtonSize) {
     val isDark = LocalThemeColors.current.isDark
     val progress by animateFloatAsState(
         targetValue = if (isDark) 1f else 0f,
@@ -151,15 +157,17 @@ fun DarkModeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     CircularButtonShell(
         contentDescription = if (isDark) "Switch to light mode" else "Switch to dark mode",
         onClick = onClick,
-        modifier = modifier
+        modifier = modifier,
+        size = size
     ) {
+        val iconSize = size * 0.5f
         Box(contentAlignment = Alignment.Center) {
             Icon(
                 imageVector = Icons.Outlined.DarkMode,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(iconSize)
                     .graphicsLayer {
                         alpha = 1f - progress
                         rotationZ = -90f * progress
@@ -172,7 +180,7 @@ fun DarkModeButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier
-                    .size(20.dp)
+                    .size(iconSize)
                     .graphicsLayer {
                         alpha = progress
                         rotationZ = 90f * (1f - progress)
