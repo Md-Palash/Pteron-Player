@@ -6,7 +6,12 @@ import androidx.lifecycle.viewModelScope
 import com.pteron.player.data.media.MediaStoreRepository
 import com.pteron.player.data.model.Playlist
 import com.pteron.player.data.model.VideoItem
+import com.pteron.player.data.model.hydrate
+import com.pteron.player.data.prefs.PlaybackStateRepository
 import com.pteron.player.data.prefs.PlaylistRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -51,11 +56,18 @@ data class PlaylistDetailUiState(
 class PlaylistDetailViewModel(
     private val playlistId: Long,
     private val repository: PlaylistRepository,
-    private val mediaStoreRepository: MediaStoreRepository
+    private val mediaStoreRepository: MediaStoreRepository,
+    private val playbackStateRepository: PlaybackStateRepository
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(PlaylistDetailUiState())
-    val uiState: StateFlow<PlaylistDetailUiState> = _uiState.asStateFlow()
+
+    /** The playlist's videos with resume / watched / favorite state laid over them, like every other video list. */
+    val uiState: StateFlow<PlaylistDetailUiState> = combine(_uiState, playbackStateRepository.allStates) { ui, states ->
+        ui.copy(videos = ui.videos.hydrate(states))
+    }
+        .flowOn(Dispatchers.Default)
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PlaylistDetailUiState())
 
     init {
         viewModelScope.launch {
@@ -87,13 +99,26 @@ class PlaylistDetailViewModel(
         viewModelScope.launch { repository.moveVideo(playlistId, video.id, delta) }
     }
 
+    fun toggleFavorite(video: VideoItem) {
+        viewModelScope.launch { playbackStateRepository.setFavorite(video.id, !video.isFavorite) }
+    }
+
+    fun toggleWatched(video: VideoItem) {
+        viewModelScope.launch { playbackStateRepository.setWatched(video.id, !video.isWatched) }
+    }
+
+    fun clearProgress(video: VideoItem) {
+        viewModelScope.launch { playbackStateRepository.clearPosition(video.id) }
+    }
+
     class Factory(
         private val playlistId: Long,
         private val repository: PlaylistRepository,
-        private val mediaStoreRepository: MediaStoreRepository
+        private val mediaStoreRepository: MediaStoreRepository,
+        private val playbackStateRepository: PlaybackStateRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            PlaylistDetailViewModel(playlistId, repository, mediaStoreRepository) as T
+            PlaylistDetailViewModel(playlistId, repository, mediaStoreRepository, playbackStateRepository) as T
     }
 }

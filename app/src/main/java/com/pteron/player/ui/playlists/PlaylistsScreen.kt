@@ -9,13 +9,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
@@ -40,6 +42,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.pteron.player.data.model.Playlist
@@ -101,9 +105,11 @@ fun PlaylistsScreen(
                         onAction = { showCreate = true },
                         modifier = Modifier.fillMaxSize()
                     )
-                    else -> LazyColumn(
+                    else -> LazyVerticalGrid(
+                        columns = GridCells.Fixed(2),
                         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = BottomNavClearance),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
                         items(list, key = { it.id }) { playlist ->
@@ -156,6 +162,11 @@ fun PlaylistsScreen(
     }
 }
 
+/**
+ * A playlist as a grid card, same look as a video grid tile: the first video's thumbnail fills the
+ * whole card (an accent tile with a glyph while the playlist is empty), name and count sit on a
+ * bottom scrim and the menu button floats in the top-right corner.
+ */
 @Composable
 private fun PlaylistCard(
     playlist: Playlist,
@@ -164,66 +175,13 @@ private fun PlaylistCard(
     onDelete: () -> Unit
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    val count = playlist.videoIds.size
     PteronClickableCard(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp)
+        modifier = Modifier.fillMaxWidth().aspectRatio(1.45f),
+        shape = RoundedCornerShape(18.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            PlaylistCover(firstVideoId = playlist.videoIds.firstOrNull())
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    playlist.name,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                val count = playlist.videoIds.size
-                Text(
-                    "$count video${if (count == 1) "" else "s"}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    DropdownMenuItem(
-                        text = { Text("Rename") },
-                        leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onRename()
-                        }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("Delete") },
-                        leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onDelete()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-/** The first video's thumbnail, or an accent tile with a playlist glyph while the playlist is empty. */
-@Composable
-private fun PlaylistCover(firstVideoId: Long?) {
-    val shape = RoundedCornerShape(14.dp)
-    Box(
-        modifier = Modifier.width(96.dp).height(60.dp).clip(shape),
-        contentAlignment = Alignment.Center
-    ) {
+        val firstVideoId = playlist.videoIds.firstOrNull()
         if (firstVideoId != null) {
             ThumbnailImage(
                 contentUri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, firstVideoId).toString(),
@@ -238,7 +196,44 @@ private fun PlaylistCover(firstVideoId: Long?) {
                     Icons.Outlined.PlaylistPlay,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .align(Alignment.BottomCenter)
+                .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.78f))))
+                .padding(start = 10.dp, end = 10.dp, top = 26.dp, bottom = 9.dp)
+        ) {
+            Text(
+                playlist.name,
+                style = MaterialTheme.typography.titleSmall,
+                color = Color.White,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                "$count video${if (count == 1) "" else "s"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.85f)
+            )
+        }
+        Box(modifier = Modifier.align(Alignment.TopEnd).padding(2.dp)) {
+            IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
+                Icon(Icons.Outlined.MoreVert, contentDescription = "More options", tint = Color.White, modifier = Modifier.size(16.dp))
+            }
+            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                DropdownMenuItem(
+                    text = { Text("Rename") },
+                    leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
+                    onClick = { menuOpen = false; onRename() }
+                )
+                DropdownMenuItem(
+                    text = { Text("Delete") },
+                    leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
+                    onClick = { menuOpen = false; onDelete() }
                 )
             }
         }

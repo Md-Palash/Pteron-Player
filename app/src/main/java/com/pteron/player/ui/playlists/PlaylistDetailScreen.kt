@@ -56,6 +56,7 @@ import com.pteron.player.ui.common.PteronClickableCard
 import com.pteron.player.ui.common.ThumbnailImage
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
+import com.pteron.player.ui.folder.VideoListRow
 import com.pteron.player.util.formatFileSize
 import com.pteron.player.util.formatTimecode
 
@@ -161,14 +162,34 @@ fun PlaylistDetailScreen(
                         modifier = Modifier.fillMaxSize()
                     ) {
                         itemsIndexed(videos, key = { _, video -> video.id }) { index, video ->
-                            PlaylistVideoRow(
+                            // The same list row as the Videos tab; the playlist actions join its "..." menu.
+                            VideoListRow(
                                 video = video,
-                                canMoveUp = index > 0,
-                                canMoveDown = index < videos.lastIndex,
                                 onClick = { onPlay(video, false) },
-                                onMoveUp = { viewModel.move(video, -1) },
-                                onMoveDown = { viewModel.move(video, 1) },
-                                onRemove = { viewModel.remove(video) }
+                                onToggleFavorite = { viewModel.toggleFavorite(video) },
+                                onToggleWatched = { viewModel.toggleWatched(video) },
+                                onClearProgress = { viewModel.clearProgress(video) },
+                                extraMenuItems = { dismiss ->
+                                    if (index > 0) {
+                                        DropdownMenuItem(
+                                            text = { Text("Move up") },
+                                            leadingIcon = { Icon(Icons.Outlined.ArrowUpward, contentDescription = null) },
+                                            onClick = { dismiss(); viewModel.move(video, -1) }
+                                        )
+                                    }
+                                    if (index < videos.lastIndex) {
+                                        DropdownMenuItem(
+                                            text = { Text("Move down") },
+                                            leadingIcon = { Icon(Icons.Outlined.ArrowDownward, contentDescription = null) },
+                                            onClick = { dismiss(); viewModel.move(video, 1) }
+                                        )
+                                    }
+                                    DropdownMenuItem(
+                                        text = { Text("Remove from playlist") },
+                                        leadingIcon = { Icon(Icons.Outlined.PlaylistRemove, contentDescription = null) },
+                                        onClick = { dismiss(); viewModel.remove(video) }
+                                    )
+                                }
                             )
                         }
                     }
@@ -204,7 +225,7 @@ fun PlaylistDetailScreen(
 
 /** A pill button: accent-filled for the main action, card shade for the secondary one. */
 @Composable
-private fun ActionPill(
+fun ActionPill(
     label: String,
     icon: ImageVector,
     filled: Boolean,
@@ -232,93 +253,3 @@ private fun ActionPill(
     }
 }
 
-@Composable
-private fun PlaylistVideoRow(
-    video: VideoItem,
-    canMoveUp: Boolean,
-    canMoveDown: Boolean,
-    onClick: () -> Unit,
-    onMoveUp: () -> Unit,
-    onMoveDown: () -> Unit,
-    onRemove: () -> Unit
-) {
-    var menuOpen by remember { mutableStateOf(false) }
-    PteronClickableCard(
-        onClick = onClick,
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(112.dp)
-                    .aspectRatio(16f / 9f)
-                    .clip(RoundedCornerShape(12.dp))
-            ) {
-                ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(4.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(Color.Black.copy(alpha = 0.7f))
-                        .padding(horizontal = 4.dp, vertical = 1.dp)
-                ) {
-                    Text(formatTimecode(video.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    video.displayName,
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    formatFileSize(video.sizeBytes),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Box {
-                IconButton(onClick = { menuOpen = true }) {
-                    Icon(Icons.Outlined.MoreVert, contentDescription = "More options")
-                }
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                    if (canMoveUp) {
-                        DropdownMenuItem(
-                            text = { Text("Move up") },
-                            leadingIcon = { Icon(Icons.Outlined.ArrowUpward, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onMoveUp()
-                            }
-                        )
-                    }
-                    if (canMoveDown) {
-                        DropdownMenuItem(
-                            text = { Text("Move down") },
-                            leadingIcon = { Icon(Icons.Outlined.ArrowDownward, contentDescription = null) },
-                            onClick = {
-                                menuOpen = false
-                                onMoveDown()
-                            }
-                        )
-                    }
-                    DropdownMenuItem(
-                        text = { Text("Remove from playlist") },
-                        leadingIcon = { Icon(Icons.Outlined.PlaylistRemove, contentDescription = null) },
-                        onClick = {
-                            menuOpen = false
-                            onRemove()
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
