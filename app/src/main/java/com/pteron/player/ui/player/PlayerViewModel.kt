@@ -564,6 +564,22 @@ class PlayerViewModel(
         player.pause()
     }
 
+    private var exiting = false
+
+    /**
+     * Called the moment the person taps back, before the leave animation starts. Releasing an
+     * ExoPlayer blocks the main thread until its playback thread has torn down the decoders; doing
+     * that at the end of the pop animation (when this ViewModel is cleared) froze the last frames.
+     * Stopping first (asynchronous, position is kept) makes the later release almost instant.
+     */
+    fun prepareToExit() {
+        if (exiting) return
+        exiting = true
+        saveProgress(force = true)
+        stopPositionTicker()
+        player.stop()
+    }
+
     /** Clamps to the video's length -- but only once that length is known (it is TIME_UNSET
      *  while preparing; clamping to 0 then would throw the video back to the very start). */
     private fun clampToDuration(positionMs: Long): Long {

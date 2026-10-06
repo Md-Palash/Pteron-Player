@@ -170,6 +170,11 @@ fun PlayerScreen(
     }
     val scrubbingNow by rememberUpdatedState(scrubPreviewMs != null)
 
+    // Stops decoding right away, so the heavy player release does not land in the middle of the
+    // leave animation (that was the slight freeze when going back).
+    val exitPlayer = remember(viewModel, onBack) { { viewModel.prepareToExit(); onBack() } }
+    BackHandler(enabled = !isLocked) { exitPlayer() }
+
     // While locked, system Back must not leave the player: it just shows the unlock button.
     BackHandler(enabled = isLocked) { controlsVisible = true }
 
@@ -430,7 +435,7 @@ fun PlayerScreen(
                 frameRate = uiState.frameRate,
                 selectedAudioLabel = uiState.audioTracks.firstOrNull { it.isSelected }?.label,
                 selectedSubtitleLabel = uiState.subtitleTracks.firstOrNull { it.isSelected }?.label,
-                onBack = onBack,
+                onBack = exitPlayer,
                 onToggleFavorite = viewModel::toggleFavoriteCurrent,
                 onOpenAudioTracks = { showAudioSheet = true },
                 onOpenSubtitleTracks = { showSubtitleSheet = true }
