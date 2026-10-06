@@ -94,6 +94,7 @@ import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.MusicPrefsState
+import com.pteron.player.data.prefs.NowPlayingStyle
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.navigation.BottomNavDestination
@@ -300,6 +301,7 @@ private fun SettingsSectionContent(
                 LabeledGroup("Sound") { MusicSoundCard(musicPrefs, viewModel) }
                 LabeledGroup("Library") { MusicLibraryCard(musicPrefs, viewModel) }
                 LabeledGroup("Playback") { MusicPlaybackCard(musicPrefs, viewModel) }
+                LabeledGroup("Now Playing") { NowPlayingStyleCard(musicPrefs, viewModel) }
                 DataActionCard(
                     icon = Icons.Outlined.DeleteSweep,
                     title = "Clear recently played",
@@ -1157,6 +1159,29 @@ private fun MusicLibraryCard(prefs: MusicPrefsState, viewModel: SettingsViewMode
                         selected = prefs.minTrackSeconds == seconds,
                         onClick = { viewModel.setMinTrackSeconds(seconds) },
                         label = { Text(label) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun NowPlayingStyleCard(prefs: MusicPrefsState, viewModel: SettingsViewModel) {
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Card style", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Circular shows the cover in a circle with a wavy progress ring around it. Square shows it as a rounded square without the ring.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NowPlayingStyle.entries.forEach { style ->
+                    FilterChip(
+                        selected = prefs.nowPlayingStyle == style,
+                        onClick = { viewModel.setNowPlayingStyle(style) },
+                        label = { Text(style.displayName) }
                     )
                 }
             }

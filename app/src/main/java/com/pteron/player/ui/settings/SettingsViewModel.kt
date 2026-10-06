@@ -11,6 +11,7 @@ import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.AudioStateRepository
 import com.pteron.player.data.prefs.MusicPrefsRepository
 import com.pteron.player.data.prefs.MusicPrefsState
+import com.pteron.player.data.prefs.NowPlayingStyle
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
@@ -88,6 +89,7 @@ class SettingsViewModel(
     fun setPauseOnHeadphonesUnplugged(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setPauseOnHeadphonesUnplugged(value) }
     fun setKeepScreenOnInNowPlaying(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setKeepScreenOnInNowPlaying(value) }
     fun setOpenNowPlayingOnPlay(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setOpenNowPlayingOnPlay(value) }
+    fun setNowPlayingStyle(style: NowPlayingStyle) = viewModelScope.launch { musicPrefsRepository.setNowPlayingStyle(style) }
     fun clearRecentlyPlayed() = viewModelScope.launch { audioStateRepository.clearRecent() }
 
     fun clearWatchHistory() = viewModelScope.launch { playbackStateRepository.clearAll() }
