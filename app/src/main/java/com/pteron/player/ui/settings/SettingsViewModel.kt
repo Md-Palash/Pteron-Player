@@ -8,6 +8,9 @@ import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.AppearanceState
+import com.pteron.player.data.prefs.AudioStateRepository
+import com.pteron.player.data.prefs.MusicPrefsRepository
+import com.pteron.player.data.prefs.MusicPrefsState
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
@@ -20,7 +23,9 @@ import kotlinx.coroutines.launch
 class SettingsViewModel(
     private val appearanceRepository: AppearancePrefsRepository,
     private val playbackPrefsRepository: PlaybackPrefsRepository,
-    private val playbackStateRepository: PlaybackStateRepository
+    private val playbackStateRepository: PlaybackStateRepository,
+    private val musicPrefsRepository: MusicPrefsRepository,
+    private val audioStateRepository: AudioStateRepository
 ) : ViewModel() {
 
     val appearance: StateFlow<AppearanceState> = appearanceRepository.state.stateIn(
@@ -30,12 +35,17 @@ class SettingsViewModel(
                 canvasShade = it.canvasShade,
                 cardShade = it.cardShade,
                 folderShade = it.folderShade,
-                font = it.font
+                font = it.font,
+                fontScale = it.fontScale
             )
         }
     )
     val playbackPrefs: StateFlow<PlaybackPrefsState> = playbackPrefsRepository.state.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5000), PlaybackPrefsState()
+    )
+
+    val musicPrefs: StateFlow<MusicPrefsState> = musicPrefsRepository.state.stateIn(
+        viewModelScope, SharingStarted.WhileSubscribed(5000), MusicPrefsState()
     )
 
     // --- Appearance -------------------------------------------------------------
@@ -46,6 +56,8 @@ class SettingsViewModel(
     fun setFolderShade(value: Float) = viewModelScope.launch { appearanceRepository.setFolderShade(value) }
     fun resetShades() = viewModelScope.launch { appearanceRepository.resetShades() }
     fun setFont(font: AppFont) = viewModelScope.launch { appearanceRepository.setFont(font) }
+    fun setFontScale(scale: Float) = viewModelScope.launch { appearanceRepository.setFontScale(scale) }
+    fun setVideoGridColumns(columns: Int) = viewModelScope.launch { appearanceRepository.setVideoGridColumns(columns) }
     fun setShowVideoCountBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowVideoCountBadge(value) }
     fun setShowFolderSizeBadge(value: Boolean) = viewModelScope.launch { appearanceRepository.setShowFolderSizeBadge(value) }
     fun setGestureSensitivity(value: Float) = viewModelScope.launch { appearanceRepository.setGestureSensitivity(value) }
@@ -65,6 +77,19 @@ class SettingsViewModel(
     fun setDefaultAspectRatio(mode: AspectRatioMode) = viewModelScope.launch { playbackPrefsRepository.setDefaultAspectRatio(mode) }
     fun setControlAutoHideSeconds(seconds: Int) = viewModelScope.launch { playbackPrefsRepository.setControlAutoHideSeconds(seconds) }
 
+    // --- Music player -------------------------------------------------------------
+
+    fun setSkipSilence(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setSkipSilence(value) }
+    fun setLoudnessBoostEnabled(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setLoudnessBoostEnabled(value) }
+    fun setLoudnessBoostLevel(value: Float) = viewModelScope.launch { musicPrefsRepository.setLoudnessBoostLevel(value) }
+    fun setBassBoostLevel(value: Float) = viewModelScope.launch { musicPrefsRepository.setBassBoostLevel(value) }
+    fun setVirtualizerLevel(value: Float) = viewModelScope.launch { musicPrefsRepository.setVirtualizerLevel(value) }
+    fun setMinTrackSeconds(value: Int) = viewModelScope.launch { musicPrefsRepository.setMinTrackSeconds(value) }
+    fun setPauseOnHeadphonesUnplugged(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setPauseOnHeadphonesUnplugged(value) }
+    fun setKeepScreenOnInNowPlaying(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setKeepScreenOnInNowPlaying(value) }
+    fun setOpenNowPlayingOnPlay(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setOpenNowPlayingOnPlay(value) }
+    fun clearRecentlyPlayed() = viewModelScope.launch { audioStateRepository.clearRecent() }
+
     fun clearWatchHistory() = viewModelScope.launch { playbackStateRepository.clearAll() }
 
     fun toggleDarkMode() = viewModelScope.launch { appearanceRepository.toggleDarkMode() }
@@ -72,10 +97,15 @@ class SettingsViewModel(
     class Factory(
         private val appearanceRepository: AppearancePrefsRepository,
         private val playbackPrefsRepository: PlaybackPrefsRepository,
-        private val playbackStateRepository: PlaybackStateRepository
+        private val playbackStateRepository: PlaybackStateRepository,
+        private val musicPrefsRepository: MusicPrefsRepository,
+        private val audioStateRepository: AudioStateRepository
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
-            SettingsViewModel(appearanceRepository, playbackPrefsRepository, playbackStateRepository) as T
+            SettingsViewModel(
+                appearanceRepository, playbackPrefsRepository, playbackStateRepository,
+                musicPrefsRepository, audioStateRepository
+            ) as T
     }
 }

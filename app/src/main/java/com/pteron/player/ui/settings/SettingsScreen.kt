@@ -46,7 +46,9 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.FormatSize
 import androidx.compose.material.icons.outlined.GraphicEq
+import androidx.compose.material.icons.outlined.MusicNote
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RestartAlt
@@ -86,10 +88,12 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearanceState
+import com.pteron.player.data.prefs.MusicPrefsState
 import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.navigation.BottomNavDestination
@@ -113,10 +117,11 @@ import kotlin.math.roundToInt
  */
 private enum class SettingsSection(val title: String, val subtitle: String, val icon: ImageVector) {
     APPEARANCE("Appearance", "Theme, shades and font", Icons.Outlined.Palette),
-    LIBRARY("Library & folders", "Folder tile badges", Icons.Outlined.FolderOpen),
+    LIBRARY("Library & folders", "Folder badges and video grid", Icons.Outlined.FolderOpen),
     PLAYER("Player controls", "Gestures, seeking and control style", Icons.Outlined.TouchApp),
     PLAYBACK("Playback", "Resume, auto-play and screen behavior", Icons.Outlined.PlayCircle),
     AUDIO_SUBTITLES("Audio & subtitles", "Volume boost and subtitle size", Icons.Outlined.GraphicEq),
+    MUSIC("Music Player", "Sound, library and playback", Icons.Outlined.MusicNote),
     DATA("Data & reset", "Watch history and default settings", Icons.Outlined.Storage)
 }
 
@@ -142,6 +147,7 @@ private fun settingsTransition(opening: Boolean): ContentTransform {
 fun SettingsScreen(viewModel: SettingsViewModel) {
     val appearance by viewModel.appearance.collectAsState()
     val playbackPrefs by viewModel.playbackPrefs.collectAsState()
+    val musicPrefs by viewModel.musicPrefs.collectAsState()
 
     // Survives rotation and returning from another tab, so the person stays where they were.
     var openSectionName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -201,7 +207,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                     if (section == null) {
                         SettingsHome(onOpen = { openSectionName = it.name })
                     } else {
-                        SettingsSectionContent(section, appearance, playbackPrefs, viewModel)
+                        SettingsSectionContent(section, appearance, playbackPrefs, musicPrefs, viewModel)
                     }
                 }
             }
@@ -263,6 +269,7 @@ private fun SettingsSectionContent(
     section: SettingsSection,
     appearance: AppearanceState,
     playbackPrefs: PlaybackPrefsState,
+    musicPrefs: MusicPrefsState,
     viewModel: SettingsViewModel
 ) {
     SettingsPage {
@@ -270,10 +277,11 @@ private fun SettingsSectionContent(
             SettingsSection.APPEARANCE -> {
                 ThemeSection(appearance.theme, viewModel::setTheme)
                 LabeledGroup("Shades") { ShadeCard(appearance, viewModel) }
-                FontCard(appearance.font, viewModel::setFont)
+                FontSection(appearance.font, appearance.fontScale, viewModel::setFont, viewModel::setFontScale)
             }
             SettingsSection.LIBRARY -> {
                 FolderAppearanceCard(appearance, viewModel)
+                LabeledGroup("Video grid") { VideoGridCard(appearance, viewModel) }
             }
             SettingsSection.PLAYER -> {
                 GestureSensitivityCard(appearance, viewModel)
@@ -287,6 +295,18 @@ private fun SettingsSectionContent(
             SettingsSection.AUDIO_SUBTITLES -> {
                 LabeledGroup("Audio") { AudioBoostCard(playbackPrefs, viewModel) }
                 LabeledGroup("Subtitles") { SubtitleSizeCard(playbackPrefs, viewModel) }
+            }
+            SettingsSection.MUSIC -> {
+                LabeledGroup("Sound") { MusicSoundCard(musicPrefs, viewModel) }
+                LabeledGroup("Library") { MusicLibraryCard(musicPrefs, viewModel) }
+                LabeledGroup("Playback") { MusicPlaybackCard(musicPrefs, viewModel) }
+                DataActionCard(
+                    icon = Icons.Outlined.DeleteSweep,
+                    title = "Clear recently played",
+                    description = "Empties the Recently played row in the Audio section. Your songs and favorites are not affected.",
+                    actionLabel = "Clear",
+                    onAction = viewModel::clearRecentlyPlayed
+                )
             }
             SettingsSection.DATA -> {
                 DataCards(viewModel)
@@ -501,68 +521,222 @@ private fun ThemeSection(selected: AppTheme, onSelect: (AppTheme) -> Unit) {
     }
 }
 
-/** The round icon bubble of the Theme card: a miniature of the current theme's three shades. */
+/** The round icon bubble of the Theme card: filled completely with the selected theme's color. */
 @Composable
 private fun ThemeSwatch(theme: AppTheme) {
     val colors = remember(theme) { theme.colors() }
-    Canvas(
+    Box(
         modifier = Modifier
             .size(48.dp)
             .clip(CircleShape)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape)
-    ) {
-        drawRect(colors.background)
-        drawRect(colors.card, topLeft = Offset(0f, size.height * 0.55f), size = Size(size.width, size.height * 0.45f))
-        drawCircle(colors.accent, radius = size.minDimension * 0.17f, center = Offset(size.width / 2f, size.height * 0.38f))
+            .background(colors.accent)
+    )
+}
+
+private val fontSizeOptions = listOf(0.85f to "Small", 1.0f to "Default", 1.15f to "Large", 1.3f to "Extra large")
+
+private fun fontSizeLabel(scale: Float): String =
+    fontSizeOptions.minByOrNull { kotlin.math.abs(it.first - scale) }?.second ?: "Default"
+
+/**
+ * The "Font" card. Like the Theme card it unfolds when tapped, showing two cards underneath: one to
+ * choose the font (opens the font sheet) and one to choose the text size (opens the size sheet).
+ * Both bubbles preview the current choice.
+ */
+@Composable
+private fun FontSection(
+    font: AppFont,
+    scale: Float,
+    onSelectFont: (AppFont) -> Unit,
+    onSelectScale: (Float) -> Unit
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    var showFontSheet by rememberSaveable { mutableStateOf(false) }
+    var showSizeSheet by rememberSaveable { mutableStateOf(false) }
+    val scheme = MaterialTheme.colorScheme
+    val chevron by animateFloatAsState(
+        targetValue = if (expanded) 90f else 0f,
+        animationSpec = tween(260, easing = FastOutSlowInEasing),
+        label = "fontChevron"
+    )
+    Column {
+        SettingsSetCard(shape = setItemShape(0, 1), onClick = { expanded = !expanded }) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                FontBubble(font)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Font", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "${font.displayName} \u2022 ${fontSizeLabel(scale)}",
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = font.fontFamily()),
+                        color = scheme.onSurfaceVariant,
+                        maxLines = 1
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
+                    contentDescription = if (expanded) "Hide font options" else "Show font options",
+                    tint = scheme.onSurfaceVariant,
+                    modifier = Modifier.graphicsLayer { rotationZ = chevron }
+                )
+            }
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically(tween(300, easing = FastOutSlowInEasing)) + fadeIn(tween(240, delayMillis = 60)),
+            exit = shrinkVertically(tween(240, easing = FastOutSlowInEasing)) + fadeOut(tween(120))
+        ) {
+            Column(modifier = Modifier.padding(top = 12.dp)) {
+                SettingsSet(count = 2) { index, shape ->
+                    if (index == 0) {
+                        SettingsSetCard(shape = shape, onClick = { showFontSheet = true }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                FontBubble(font)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Choose font", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        font.displayName,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = font.fontFamily()),
+                                        color = scheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = scheme.onSurfaceVariant)
+                            }
+                        }
+                    } else {
+                        SettingsSetCard(shape = shape, onClick = { showSizeSheet = true }) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier.size(48.dp).clip(CircleShape).background(scheme.primary),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(Icons.Outlined.FormatSize, contentDescription = null, tint = scheme.onPrimary, modifier = Modifier.size(24.dp))
+                                }
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("Font size", style = MaterialTheme.typography.titleMedium)
+                                    Text(
+                                        "${fontSizeLabel(scale)} (${(scale * 100).roundToInt()}%)",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = scheme.onSurfaceVariant,
+                                        maxLines = 1
+                                    )
+                                }
+                                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = scheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if (showFontSheet) {
+        FontSheet(
+            selected = font,
+            onSelect = {
+                onSelectFont(it)
+                showFontSheet = false
+            },
+            onDismiss = { showFontSheet = false }
+        )
+    }
+    if (showSizeSheet) {
+        FontSizeSheet(
+            selected = scale,
+            font = font,
+            onSelect = {
+                onSelectScale(it)
+                showSizeSheet = false
+            },
+            onDismiss = { showSizeSheet = false }
+        )
     }
 }
 
-/** A "Font" card showing the current font in its own typeface; tapping opens the picker sheet. */
+/** The "Aa" bubble: the sample is drawn in the selected font. */
 @Composable
-private fun FontCard(selected: AppFont, onSelect: (AppFont) -> Unit) {
-    var showSheet by rememberSaveable { mutableStateOf(false) }
+private fun FontBubble(font: AppFont) {
     val scheme = MaterialTheme.colorScheme
-    SettingsSetCard(shape = setItemShape(0, 1), onClick = { showSheet = true }) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(48.dp).clip(CircleShape).background(scheme.primary),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "Aa",
-                    style = MaterialTheme.typography.titleMedium.copy(fontFamily = selected.fontFamily()),
-                    color = scheme.onPrimary
-                )
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Font", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    selected.displayName,
-                    style = MaterialTheme.typography.bodySmall.copy(fontFamily = selected.fontFamily()),
-                    color = scheme.onSurfaceVariant,
-                    maxLines = 1
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Outlined.KeyboardArrowRight,
-                contentDescription = null,
-                tint = scheme.onSurfaceVariant
-            )
-        }
-    }
-    if (showSheet) {
-        FontSheet(
-            selected = selected,
-            onSelect = {
-                onSelect(it)
-                showSheet = false
-            },
-            onDismiss = { showSheet = false }
+    Box(
+        modifier = Modifier.size(48.dp).clip(CircleShape).background(scheme.primary),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            "Aa",
+            style = MaterialTheme.typography.titleMedium.copy(fontFamily = font.fontFamily()),
+            color = scheme.onPrimary
         )
+    }
+}
+
+/** Bottom sheet with a live preview line and one pill per size; each pill is drawn at its own size. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FontSizeSheet(selected: Float, font: AppFont, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    var preview by remember { mutableFloatStateOf(selected) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+                .padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Font size",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            )
+            SettingsCard {
+                Text(
+                    "The quick brown fox jumps over the lazy dog.",
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontFamily = font.fontFamily(),
+                        fontSize = (14f * preview / selected.coerceAtLeast(0.1f)).sp * selected
+                    ),
+                    modifier = Modifier.padding(16.dp)
+                )
+            }
+            fontSizeOptions.forEach { (value, label) ->
+                val isSelected = kotlin.math.abs(value - selected) < 0.01f
+                val content = if (isSelected) scheme.onPrimary else scheme.onSurface
+                PteronClickableCard(
+                    onClick = { onSelect(value) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(percent = 50),
+                    color = if (isSelected) scheme.primary else scheme.surfaceContainer,
+                    borderColor = if (isSelected) androidx.compose.ui.graphics.Color.Transparent
+                    else scheme.outlineVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.titleSmall.copy(fontSize = (14f * value / selected.coerceAtLeast(0.1f)).sp * selected),
+                            color = content,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isSelected) {
+                            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -636,6 +810,29 @@ private fun FolderAppearanceCard(appearance: AppearanceState, viewModel: Setting
                 checked = appearance.showFolderSizeBadge,
                 onCheckedChange = viewModel::setShowFolderSizeBadge
             )
+        }
+    }
+}
+
+@Composable
+private fun VideoGridCard(appearance: AppearanceState, viewModel: SettingsViewModel) {
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Videos per row", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "How many video tiles fit in one line of the grid view.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(2, 3).forEach { columns ->
+                    FilterChip(
+                        selected = appearance.videoGridColumns == columns,
+                        onClick = { viewModel.setVideoGridColumns(columns) },
+                        label = { Text("$columns videos") }
+                    )
+                }
+            }
         }
     }
 }
@@ -848,7 +1045,7 @@ private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewMod
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             SettingsSwitchRow(
                 title = "Audio boost",
-                subtitle = "Amplifies quiet audio beyond 100% volume, MX Player-style",
+                subtitle = "Amplifies quiet audio beyond 100% volume",
                 checked = prefs.audioBoostEnabled,
                 onCheckedChange = viewModel::setAudioBoostEnabled
             )
@@ -882,6 +1079,115 @@ private fun SubtitleSizeCard(prefs: PlaybackPrefsState, viewModel: SettingsViewM
                 valueRange = 12f..28f,
                 onCommit = viewModel::setSubtitleTextSize,
                 valueLabel = { "${it.toInt()}sp" }
+            )
+        }
+    }
+}
+
+// --- Music player -----------------------------------------------------------------------------
+
+@Composable
+private fun MusicSoundCard(prefs: MusicPrefsState, viewModel: SettingsViewModel) {
+    val divider = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SettingsSwitchRow(
+                title = "Skip silence",
+                subtitle = "Jumps over silent stretches inside a track",
+                checked = prefs.skipSilence,
+                onCheckedChange = viewModel::setSkipSilence
+            )
+            HorizontalDivider(color = divider)
+            SettingsSwitchRow(
+                title = "Loudness boost",
+                subtitle = "Lifts quiet tracks above the normal volume",
+                checked = prefs.loudnessBoostEnabled,
+                onCheckedChange = viewModel::setLoudnessBoostEnabled
+            )
+            if (prefs.loudnessBoostEnabled) {
+                SliderSetting(
+                    title = "Boost level",
+                    value = prefs.loudnessBoostLevel,
+                    valueRange = 0f..100f,
+                    onCommit = viewModel::setLoudnessBoostLevel,
+                    valueLabel = { "${it.toInt()}%" },
+                    footer = {
+                        Text(
+                            "Higher boost can distort audio on some devices and tracks.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+            }
+            HorizontalDivider(color = divider)
+            SliderSetting(
+                title = "Bass boost",
+                description = "Adds low-end punch. Not available on every device.",
+                value = prefs.bassBoostLevel,
+                valueRange = 0f..100f,
+                onCommit = viewModel::setBassBoostLevel,
+                valueLabel = { if (it < 1f) "Off" else "${it.toInt()}%" }
+            )
+            SliderSetting(
+                title = "Surround",
+                description = "Widens the stereo image, best with headphones. Not available on every device.",
+                value = prefs.virtualizerLevel,
+                valueRange = 0f..100f,
+                onCommit = viewModel::setVirtualizerLevel,
+                valueLabel = { if (it < 1f) "Off" else "${it.toInt()}%" }
+            )
+        }
+    }
+}
+
+@Composable
+private fun MusicLibraryCard(prefs: MusicPrefsState, viewModel: SettingsViewModel) {
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text("Ignore short tracks", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Hides ringtones, notification sounds and clips shorter than this from your music library.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(0 to "Off", 15 to "15s", 30 to "30s", 60 to "60s").forEach { (seconds, label) ->
+                    FilterChip(
+                        selected = prefs.minTrackSeconds == seconds,
+                        onClick = { viewModel.setMinTrackSeconds(seconds) },
+                        label = { Text(label) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MusicPlaybackCard(prefs: MusicPrefsState, viewModel: SettingsViewModel) {
+    val divider = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    SettingsCard {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            SettingsSwitchRow(
+                title = "Pause when headphones unplug",
+                subtitle = "Stops the music when wired or Bluetooth headphones disconnect",
+                checked = prefs.pauseOnHeadphonesUnplugged,
+                onCheckedChange = viewModel::setPauseOnHeadphonesUnplugged
+            )
+            HorizontalDivider(color = divider)
+            SettingsSwitchRow(
+                title = "Open Now Playing on start",
+                subtitle = "Jumps to the full player when you start a song",
+                checked = prefs.openNowPlayingOnPlay,
+                onCheckedChange = viewModel::setOpenNowPlayingOnPlay
+            )
+            HorizontalDivider(color = divider)
+            SettingsSwitchRow(
+                title = "Keep screen on in Now Playing",
+                subtitle = "Prevents the display from sleeping while the full player is open",
+                checked = prefs.keepScreenOnInNowPlaying,
+                onCheckedChange = viewModel::setKeepScreenOnInNowPlaying
             )
         }
     }
