@@ -85,5 +85,7 @@ data class ThemeSettings(
     val canvasShade: Float = 0f,
     val cardShade: Float = 0f,
     val folderShade: Float = 0f,
-    val font: AppFont = AppFont.DEFAULT
+    val font: AppFont = AppFont.DEFAULT,
+    /** Text size multiplier for the whole app (1.0 = default). */
+    val fontScale: Float = 1f
 )

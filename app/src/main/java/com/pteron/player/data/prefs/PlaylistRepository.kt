@@ -13,13 +13,19 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 private val Context.playlistDataStore by preferencesDataStore(name = "playlists")
+private val Context.audioPlaylistDataStore by preferencesDataStore(name = "audio_playlists")
 
 /**
  * Persists playlists as one small JSON document in DataStore (org.json ships with Android, so no
  * extra dependency). Every change is a single read-modify-write inside `edit {}`, which DataStore
  * serializes, so two quick taps can never overwrite each other.
  */
-class PlaylistRepository(private val context: Context) {
+class PlaylistRepository(private val context: Context, audio: Boolean = false) {
+
+    /** The video playlists and the audio playlists live in two separate stores; the ids inside a
+     *  playlist are MediaStore video ids or audio ids respectively ("videoIds" is the shared name). */
+    private val store = if (audio) context.audioPlaylistDataStore else context.playlistDataStore
+
 
     companion object {
         const val MAX_NAME_LENGTH = 40
@@ -27,7 +33,7 @@ class PlaylistRepository(private val context: Context) {
 
     private val key = stringPreferencesKey("playlists_json")
 
-    val playlists: Flow<List<Playlist>> = context.playlistDataStore.data
+    val playlists: Flow<List<Playlist>> = store.data
         .map { decode(it[key]) }
         .distinctUntilChanged()
 
@@ -85,7 +91,7 @@ class PlaylistRepository(private val context: Context) {
     }
 
     private suspend fun update(transform: (List<Playlist>) -> List<Playlist>) {
-        context.playlistDataStore.edit { prefs ->
+        store.edit { prefs ->
             prefs[key] = encode(transform(decode(prefs[key])))
         }
     }

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.pteron.player.data.model.SortDirection
@@ -30,7 +31,10 @@ data class AppearanceState(
     val canvasShade: Float = 0f,
     val cardShade: Float = 0f,
     val folderShade: Float = 0f,
-    val font: AppFont = AppFont.DEFAULT
+    val font: AppFont = AppFont.DEFAULT,
+    val fontScale: Float = 1f,
+    /** Videos per row in the video grid view: 2 or 3. */
+    val videoGridColumns: Int = 2
 )
 
 /**
@@ -54,6 +58,8 @@ class AppearancePrefsRepository(private val context: Context) {
         val CARD_SHADE = floatPreferencesKey("card_shade")
         val FOLDER_SHADE = floatPreferencesKey("folder_shade")
         val APP_FONT = stringPreferencesKey("app_font")
+        val FONT_SCALE = floatPreferencesKey("font_scale")
+        val VIDEO_GRID_COLUMNS = intPreferencesKey("video_grid_columns")
     }
 
     // DataStore can only be read asynchronously, which would mean a first frame in the wrong
@@ -67,7 +73,8 @@ class AppearancePrefsRepository(private val context: Context) {
         canvasShade = themeCache.getFloat("canvas", 0f),
         cardShade = themeCache.getFloat("card", 0f),
         folderShade = themeCache.getFloat("folder", 0f),
-        font = AppFont.fromName(themeCache.getString("font", null))
+        font = AppFont.fromName(themeCache.getString("font", null)),
+        fontScale = themeCache.getFloat("font_scale", 1f)
     )
 
     /** Just the look (theme, shades, font): emits only when it really changes, so the app theme isn't rebuilt for every other setting. */
@@ -78,7 +85,8 @@ class AppearancePrefsRepository(private val context: Context) {
                 canvasShade = prefs[Keys.CANVAS_SHADE] ?: 0f,
                 cardShade = prefs[Keys.CARD_SHADE] ?: 0f,
                 folderShade = prefs[Keys.FOLDER_SHADE] ?: 0f,
-                font = AppFont.fromName(prefs[Keys.APP_FONT])
+                font = AppFont.fromName(prefs[Keys.APP_FONT]),
+                fontScale = prefs[Keys.FONT_SCALE] ?: 1f
             )
         }
         .distinctUntilChanged()
@@ -89,6 +97,7 @@ class AppearancePrefsRepository(private val context: Context) {
                 .putFloat("card", it.cardShade)
                 .putFloat("folder", it.folderShade)
                 .putString("font", it.font.name)
+                .putFloat("font_scale", it.fontScale)
                 .apply()
         }
 
@@ -109,7 +118,9 @@ class AppearancePrefsRepository(private val context: Context) {
             canvasShade = prefs[Keys.CANVAS_SHADE] ?: 0f,
             cardShade = prefs[Keys.CARD_SHADE] ?: 0f,
             folderShade = prefs[Keys.FOLDER_SHADE] ?: 0f,
-            font = AppFont.fromName(prefs[Keys.APP_FONT])
+            font = AppFont.fromName(prefs[Keys.APP_FONT]),
+            fontScale = prefs[Keys.FONT_SCALE] ?: 1f,
+            videoGridColumns = (prefs[Keys.VIDEO_GRID_COLUMNS] ?: 2).coerceIn(2, 3)
         )
     }
 
@@ -137,6 +148,8 @@ class AppearancePrefsRepository(private val context: Context) {
         it.remove(Keys.FOLDER_SHADE)
     }
     suspend fun setFont(font: AppFont) = edit { it[Keys.APP_FONT] = font.name }
+    suspend fun setFontScale(scale: Float) = edit { it[Keys.FONT_SCALE] = scale.coerceIn(0.8f, 1.4f) }
+    suspend fun setVideoGridColumns(columns: Int) = edit { it[Keys.VIDEO_GRID_COLUMNS] = columns.coerceIn(2, 3) }
     suspend fun setShowVideoCountBadge(value: Boolean) = edit { it[Keys.SHOW_VIDEO_COUNT] = value }
     suspend fun setShowFolderSizeBadge(value: Boolean) = edit { it[Keys.SHOW_FOLDER_SIZE] = value }
     suspend fun setGestureSensitivity(value: Float) = edit { it[Keys.GESTURE_SENSITIVITY] = value.coerceIn(0.5f, 2.0f) }
