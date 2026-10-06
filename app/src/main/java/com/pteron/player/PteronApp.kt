@@ -4,12 +4,17 @@ import android.app.Application
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.memory.MemoryCache
+import com.pteron.player.data.media.AudioThumbnailFetcher
+import com.pteron.player.data.media.MediaStoreAudioRepository
 import com.pteron.player.data.media.MediaStoreRepository
 import com.pteron.player.data.media.VideoThumbnailFetcher
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackStateRepository
+import com.pteron.player.data.prefs.AudioStateRepository
+import com.pteron.player.data.prefs.MusicPrefsRepository
 import com.pteron.player.data.prefs.PlaylistRepository
+import com.pteron.player.playback.AudioPlayerController
 
 /**
  * Manual dependency container. The app intentionally avoids a DI framework
@@ -27,6 +32,17 @@ class PteronApp : Application(), ImageLoaderFactory {
     val playbackPrefsRepository: PlaybackPrefsRepository by lazy { PlaybackPrefsRepository(this) }
     val playlistRepository: PlaylistRepository by lazy { PlaylistRepository(this) }
 
+    // --- Music player ---
+    val audioRepository: MediaStoreAudioRepository by lazy { MediaStoreAudioRepository(this) }
+    val audioStateRepository: AudioStateRepository by lazy { AudioStateRepository(this) }
+    val audioPlaylistRepository: PlaylistRepository by lazy { PlaylistRepository(this, audio = true) }
+    val musicPrefsRepository: MusicPrefsRepository by lazy { MusicPrefsRepository(this) }
+
+    /** Created the first time the Audio tab needs it, so the video-only path never pays for a second ExoPlayer. */
+    val audioController: AudioPlayerController by lazy {
+        AudioPlayerController(this, audioStateRepository, musicPrefsRepository)
+    }
+
     /**
      * Coil calls this the first time an image is requested (not at app start). A shared
      * ImageLoader with a bounded memory cache and the custom video-thumbnail fetcher, so
@@ -35,7 +51,10 @@ class PteronApp : Application(), ImageLoaderFactory {
      */
     override fun newImageLoader(): ImageLoader =
         ImageLoader.Builder(this)
-            .components { add(VideoThumbnailFetcher.Factory(this@PteronApp)) }
+            .components {
+                add(VideoThumbnailFetcher.Factory(this@PteronApp))
+                add(AudioThumbnailFetcher.Factory(this@PteronApp))
+            }
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.2)
