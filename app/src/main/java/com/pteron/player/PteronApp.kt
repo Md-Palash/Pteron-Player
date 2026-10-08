@@ -57,7 +57,7 @@ class PteronApp : Application(), ImageLoaderFactory {
             }
             .memoryCache {
                 MemoryCache.Builder(this)
-                    .maxSizePercent(0.2)
+                    .maxSizePercent(0.12)
                     .build()
             }
             .crossfade(150)
