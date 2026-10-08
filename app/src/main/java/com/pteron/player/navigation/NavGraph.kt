@@ -23,6 +23,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import com.pteron.player.ui.common.PteronBottomNavBar
 import com.pteron.player.util.TabReselect
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.slideInHorizontally
@@ -87,7 +88,9 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
 // so there is never an empty frame between the two (the old 50 ms delay showed the bare window).
 private val tabEnter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
     scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.97f)
-private val tabExit = fadeOut(tween(120, easing = FastOutSlowInEasing))
+// No fade on the outgoing screen: it stays opaque underneath until the new one has covered it, which
+// avoids two translucent full-screen layers blending (the main cost of a crossfade).
+private val tabExit = ExitTransition.None
 private val tabPopEnter = tabEnter
 private val tabPopExit = tabExit
 
@@ -95,15 +98,16 @@ private val tabPopExit = tabExit
 // Leaving the player is a short plain fade instead.
 private val playerPopExit = fadeOut(tween(120))
 
-private val pushEnter = slideInHorizontally(animationSpec = tween(280)) { it / 4 } + fadeIn(tween(220))
-private val pushExit = fadeOut(tween(160))
+private val pushEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 5 } +
+    fadeIn(tween(240, easing = FastOutSlowInEasing))
+private val pushExit = ExitTransition.None
 
 // Going back mirrors going forward: the screen being left slides out to the right while it fades,
 // and the screen underneath drifts in from the left (a short parallax) as it fades up, instead of
 // popping in with a bare fade. Same easing on both so the two motions read as one gesture.
-private val popEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 8 } +
-    fadeIn(tween(260, delayMillis = 40, easing = FastOutSlowInEasing))
-private val popExit = slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 3 } +
+private val popEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 10 } +
+    fadeIn(tween(240, easing = FastOutSlowInEasing))
+private val popExit = slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 4 } +
     fadeOut(tween(220, easing = FastOutSlowInEasing))
 
 @UnstableApi
