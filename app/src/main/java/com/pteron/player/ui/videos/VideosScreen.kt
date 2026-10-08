@@ -47,9 +47,6 @@ import com.pteron.player.ui.folder.VideoListRow
 
 private val BottomNavClearance = 108.dp
 
-/** Diameter of the round buttons in the top-right row of this screen. */
-private val TopButtonSize = 48.dp
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun VideosScreen(
@@ -84,18 +81,16 @@ fun VideosScreen(
                         TopBarSortButton(
                             selectedOption = uiState.appearance.sortOption,
                             direction = uiState.appearance.sortDirection,
-                            onSelect = viewModel::onSortSelected,
-                            size = TopButtonSize
+                            onSelect = viewModel::onSortSelected
                         )
                         CircularActionButton(
                             icon = if (uiState.appearance.viewMode == ViewMode.GRID) Icons.Outlined.ViewList else Icons.Outlined.GridView,
                             contentDescription = "Toggle grid or list view",
                             onClick = {
                                 viewModel.onViewModeSelected(if (uiState.appearance.viewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID)
-                            },
-                            size = TopButtonSize
+                            }
                         )
-                        DarkModeButton(onClick = viewModel::toggleDarkMode, size = TopButtonSize)
+                        DarkModeButton(onClick = viewModel::toggleDarkMode)
                     }
                 }
 
