@@ -23,12 +23,15 @@ import com.pteron.player.data.prefs.MusicPrefsState
 import com.pteron.player.ui.player.RepeatMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /** What the mini player and the Now Playing screen show. The position lives in [AudioPlayerController.positionMs]. */
@@ -91,7 +94,7 @@ class AudioPlayerController(
 
     /** mediaId (AudioItem.id.toString()) -> song, for every item that has ever been queued. */
     private val lookup = HashMap<String, AudioItem>()
-    private var ticker: Job? = null
+    private val playing = MutableStateFlow(false)
 
     private var prefs = MusicPrefsState()
     private var audioSessionId = C.AUDIO_SESSION_ID_UNSET
@@ -106,7 +109,7 @@ class AudioPlayerController(
             override fun onEvents(player: Player, events: Player.Events) = publish()
 
             override fun onIsPlayingChanged(isPlaying: Boolean) {
-                if (isPlaying) startTicker() else stopTicker()
+                playing.value = isPlaying
             }
 
             override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -124,6 +127,21 @@ class AudioPlayerController(
                 applyEffects()
             }
         })
+
+        // The position only ticks while music plays AND something (the mini player / Now Playing
+        // screen) is actually watching it on screen. With the screen off or the app in the
+        // background nothing wakes up twice a second any more.
+        scope.launch {
+            combine(playing, _positionMs.subscriptionCount.map { it > 0 }) { p, watched -> p && watched }
+                .distinctUntilChanged()
+                .collectLatest { active ->
+                    _positionMs.value = player.currentPosition.coerceAtLeast(0L)
+                    while (active) {
+                        delay(500)
+                        _positionMs.value = player.currentPosition.coerceAtLeast(0L)
+                    }
+                }
+        }
 
         scope.launch {
             prefsRepository.state.collect { newPrefs ->
@@ -222,21 +240,6 @@ class AudioPlayerController(
             hasPrevious = player.hasPreviousMediaItem()
         )
         if (!player.isPlaying) _positionMs.value = player.currentPosition.coerceAtLeast(0L)
-    }
-
-    private fun startTicker() {
-        if (ticker?.isActive == true) return
-        ticker = scope.launch {
-            while (true) {
-                _positionMs.value = player.currentPosition.coerceAtLeast(0L)
-                delay(500)
-            }
-        }
-    }
-
-    private fun stopTicker() {
-        ticker?.cancel()
-        ticker = null
     }
 
     private fun toMediaItem(song: AudioItem): MediaItem =
