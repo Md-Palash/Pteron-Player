@@ -4,7 +4,13 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -215,7 +221,7 @@ fun SongListRow(
 
 // --- Headings, tabs, rows ---------------------------------------------------------------------
 
-private val AudioHeaderHeight = 52.dp
+private val AudioHeaderHeight = 46.dp
 
 /** A bold, moderately large heading with a thin separator line under it. */
 @Composable
@@ -296,9 +302,9 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             label,
-            style = MaterialTheme.typography.labelLarge,
+            style = MaterialTheme.typography.titleSmall,
             color = content,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
         )
     }
 }
@@ -323,11 +329,11 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
         color = scheme.surfaceContainerHighest
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            AudioArt(song.contentUri, Modifier.size(54.dp).clip(RoundedCornerShape(16.dp)), iconSize = 24.dp)
+            ProgressThumb(controller, song.contentUri, state.durationMs)
             Column(modifier = Modifier.weight(1f)) {
                 Text(song.title, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -338,11 +344,11 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                     overflow = TextOverflow.Ellipsis
                 )
             }
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 MiniRoundButton(
                     icon = Icons.Rounded.FastRewind,
                     description = "Previous",
-                    size = 38.dp,
+                    size = 36.dp,
                     container = scheme.primary.copy(alpha = 0.16f),
                     tint = scheme.primary,
                     enabled = state.hasPrevious,
@@ -351,7 +357,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                 MiniRoundButton(
                     icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     description = if (state.isPlaying) "Pause" else "Play",
-                    size = 50.dp,
+                    size = 56.dp,
                     container = scheme.primary,
                     tint = scheme.onPrimary,
                     onClick = controller::togglePlayPause
@@ -359,12 +365,34 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                 MiniRoundButton(
                     icon = Icons.Rounded.FastForward,
                     description = "Next",
-                    size = 38.dp,
+                    size = 36.dp,
                     container = scheme.primary.copy(alpha = 0.16f),
                     tint = scheme.primary,
                     enabled = state.hasNext,
                     onClick = controller::next
                 )
+            }
+        }
+    }
+}
+
+/** Round cover with a thin progress ring around it. The position is read only while drawing. */
+@Composable
+private fun ProgressThumb(controller: AudioPlayerController, contentUri: String, durationMs: Long) {
+    val scheme = MaterialTheme.colorScheme
+    val position = controller.positionMs.collectAsStateWithLifecycle()
+    val track = scheme.outlineVariant.copy(alpha = 0.6f)
+    val accent = scheme.primary
+    Box(modifier = Modifier.size(58.dp), contentAlignment = Alignment.Center) {
+        AudioArt(contentUri, Modifier.size(46.dp).clip(CircleShape), iconSize = 22.dp)
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val stroke = 3.dp.toPx()
+            val inset = stroke / 2f
+            val arcSize = Size(size.width - stroke, size.height - stroke)
+            drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
+            val p = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+            if (p > 0f) {
+                drawArc(accent, -90f, 360f * p, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
             }
         }
     }

@@ -68,7 +68,6 @@ private const val TAB_ARTIST = 3
 private const val TAB_FAVORITE = 4
 
 /** Room under scrolling content for the floating nav pill (and, when a song is loaded, the mini player). */
-private val TopButtonSize = 48.dp
 private val NavClearance = 108.dp
 private val NavAndMiniClearance = 184.dp
 
@@ -130,9 +129,9 @@ fun AudioScreen(
                     TwoLineTitle(subtitle = "PTERON PLAYER", title = "Music")
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (tab == TAB_PLAYLIST) {
-                            CircularActionButton(Icons.Outlined.Add, "New playlist", onClick = { showCreate = true }, size = TopButtonSize)
+                            CircularActionButton(Icons.Outlined.Add, "New playlist", onClick = { showCreate = true })
                         }
-                        DarkModeButton(onClick = viewModel::toggleDarkMode, size = TopButtonSize)
+                        DarkModeButton(onClick = viewModel::toggleDarkMode)
                     }
                 }
 
@@ -240,7 +239,7 @@ private fun AudioHome(
     val byId = remember(state.songs) { state.songs.associateBy { it.id } }
     LazyColumn(
         contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize()
     ) {
         item(key = "recent") {
@@ -308,7 +307,7 @@ private fun Modifier.width132() = this.then(Modifier.width(132.dp))
 
 @Composable
 private fun HomeSection(title: String, onSeeAll: (() -> Unit)? = null, content: @Composable () -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         AudioSectionHeader(title, onSeeAll = onSeeAll)
         content()
     }

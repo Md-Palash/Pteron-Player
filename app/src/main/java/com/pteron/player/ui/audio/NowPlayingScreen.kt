@@ -72,6 +72,7 @@ import com.pteron.player.playback.AudioPlayerController
 import com.pteron.player.ui.common.TwoLineTitle
 import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.ui.player.RepeatMode
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pteron.player.util.formatTimecode
 import kotlin.math.PI
 import kotlin.math.cos
@@ -141,14 +142,14 @@ fun NowPlayingScreen(
             Column(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = screenHeight * 0.20f)
+                    .padding(top = screenHeight * 0.17f)
                     .fillMaxWidth()
-                    .height(screenHeight * 0.70f)
-                    .padding(horizontal = 24.dp),
+                    .height(screenHeight * 0.74f)
+                    .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // 1) The card.
-                BoxWithConstraints(modifier = Modifier.weight(0.56f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints(modifier = Modifier.weight(0.60f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val side = min(maxWidth.value, maxHeight.value).dp
                     if (prefs.nowPlayingStyle == NowPlayingStyle.CIRCLE) {
                         CircularCard(song = song, controller = controller, side = side, isPlaying = state.isPlaying)
@@ -164,7 +165,7 @@ fun NowPlayingScreen(
 
                 // 2) Title and artist on the left, share / favorite / add-to-playlist on the right.
                 Row(
-                    modifier = Modifier.weight(0.13f).fillMaxWidth(),
+                    modifier = Modifier.weight(0.12f).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -190,13 +191,13 @@ fun NowPlayingScreen(
                 }
 
                 // 3) Seek bar with the time labels.
-                SeekBar(controller = controller, durationMs = state.durationMs, modifier = Modifier.weight(0.11f).fillMaxWidth())
+                SeekBar(controller = controller, durationMs = state.durationMs, modifier = Modifier.weight(0.10f).fillMaxWidth())
 
                 // 4) Controls: shuffle, previous, play/pause, next, repeat -- sizes step down from the middle.
-                BoxWithConstraints(modifier = Modifier.weight(0.20f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                BoxWithConstraints(modifier = Modifier.weight(0.18f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val play = min(min(maxHeight.value * 0.95f, maxWidth.value / 4.3f), 88f).dp
-                    val mid = play * 0.74f
-                    val small = play * 0.56f
+                    val mid = play * 0.66f
+                    val small = play * 0.48f
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly,
@@ -242,12 +243,12 @@ fun NowPlayingScreen(
 
 // --- Circular card with the wavy progress ring ---------------------------------------------------
 
-private val RingInset = 20.dp
+private val RingInset = 12.dp
 
 @Composable
 private fun CircularCard(song: AudioItem, controller: AudioPlayerController, side: Dp, isPlaying: Boolean) {
     val scheme = MaterialTheme.colorScheme
-    val positionState = controller.positionMs.collectAsState()
+    val positionState = controller.positionMs.collectAsStateWithLifecycle()
     val durationState = controller.state.collectAsState()
 
     // Smooths the 500 ms position ticks so the ring grows continuously. Read only while drawing.
@@ -318,7 +319,7 @@ private fun CircularCard(song: AudioItem, controller: AudioPlayerController, sid
 @Composable
 private fun SeekBar(controller: AudioPlayerController, durationMs: Long, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
-    val position: State<Long> = controller.positionMs.collectAsState()
+    val position: State<Long> = controller.positionMs.collectAsStateWithLifecycle()
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
     val duration = durationMs.coerceAtLeast(1L)
