@@ -117,7 +117,7 @@ fun TrackSelectorSheet(
 private fun SheetTitle(text: String) {
     Text(
         text,
-        style = MaterialTheme.typography.titleMedium,
+        style = MaterialTheme.typography.titleLarge,
         modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
     )
 }
@@ -155,7 +155,7 @@ private fun SelectorRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelLarge,
+                    style = MaterialTheme.typography.titleSmall,
                     color = content,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -163,7 +163,7 @@ private fun SelectorRow(
                 if (supportingLabel != null) {
                     Text(
                         supportingLabel,
-                        style = MaterialTheme.typography.bodySmall,
+                        style = MaterialTheme.typography.bodyMedium,
                         color = content.copy(alpha = 0.75f)
                     )
                 }

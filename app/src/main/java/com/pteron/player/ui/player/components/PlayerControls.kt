@@ -110,7 +110,7 @@ fun PlayerTopBar(
             Text(
                 text = title,
                 color = Color.White,
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
@@ -122,7 +122,7 @@ fun PlayerTopBar(
                         .background(Color.White.copy(alpha = 0.15f))
                         .padding(horizontal = 6.dp, vertical = 2.dp)
                 ) {
-                    Text("4K", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                    Text("4K", style = MaterialTheme.typography.labelMedium, color = Color.White)
                 }
                 androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
             }
@@ -146,7 +146,7 @@ fun PlayerTopBar(
                     ) {
                         Text(
                             if (isHardwareDecoder == true) "HW+" else "SW",
-                            style = MaterialTheme.typography.labelSmall,
+                            style = MaterialTheme.typography.labelMedium,
                             color = Color.White
                         )
                     }
@@ -179,7 +179,7 @@ fun PlayerTopBar(
                         selectedAudioLabel?.let { "Track: $it" },
                         selectedSubtitleLabel?.let { "Sub: $it" }
                     ).joinToString("   •   "),
-                    style = MaterialTheme.typography.labelSmall,
+                    style = MaterialTheme.typography.labelMedium,
                     color = Color.White.copy(alpha = 0.75f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -192,7 +192,7 @@ fun PlayerTopBar(
                             .background(Color.White.copy(alpha = 0.12f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
-                        Text("${frameRate.roundToInt()} FPS", style = MaterialTheme.typography.labelSmall, color = Color.White)
+                        Text("${frameRate.roundToInt()} FPS", style = MaterialTheme.typography.labelMedium, color = Color.White)
                     }
                 }
             }
@@ -257,11 +257,11 @@ fun PlayerBottomBar(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Text(formatTimecode(currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.labelMedium)
+            Text(formatTimecode(currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
             Text(
                 if (durationMs > 0L) formatRemaining(durationMs - currentPositionMs) else "",
                 color = Color.White.copy(alpha = 0.85f),
-                style = MaterialTheme.typography.labelMedium
+                style = MaterialTheme.typography.bodyMedium
             )
         }
 
@@ -401,7 +401,7 @@ private fun TextIconChip(text: String, icon: ImageVector, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         Icon(icon, contentDescription = "Playback speed", tint = Color.White, modifier = Modifier.size(14.dp))
-        Text(text, color = Color.White, style = MaterialTheme.typography.labelMedium)
+        Text(text, color = Color.White, style = MaterialTheme.typography.titleSmall)
     }
 }
 
