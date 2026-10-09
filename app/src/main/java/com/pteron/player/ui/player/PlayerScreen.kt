@@ -407,7 +407,7 @@ fun PlayerScreen(
                     Text(
                         text = formatTimecode(previewMs),
                         color = Color.White,
-                        style = MaterialTheme.typography.titleMedium,
+                        style = MaterialTheme.typography.titleLarge,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
