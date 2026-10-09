@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -84,6 +85,9 @@ import kotlin.math.sin
 private const val RingWaves = 22
 private val RingWaveAmplitude = 3.dp
 private val RingStroke = 5.dp
+
+/** How far the card sits above the centre of its band. */
+private val CardLift = 24.dp
 
 /**
  * Full-screen music player. The screen is laid out in fixed bands so it looks the same on every
@@ -151,15 +155,18 @@ fun NowPlayingScreen(
                 // 1) The card.
                 BoxWithConstraints(modifier = Modifier.weight(0.60f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                     val side = min(maxWidth.value, maxHeight.value).dp
-                    if (prefs.nowPlayingStyle == NowPlayingStyle.CIRCLE) {
-                        CircularCard(song = song, controller = controller, side = side, isPlaying = state.isPlaying)
-                    } else {
-                        // Same footprint as the circular card (its art sits inside the ring's inset).
-                        AudioArt(
-                            contentUri = song.contentUri,
-                            modifier = Modifier.size(side - RingInset * 2).clip(RoundedCornerShape(36.dp)),
-                            iconSize = 64.dp
-                        )
+                    // Only the card is lifted; the title row, seek bar and controls stay where they are.
+                    Box(modifier = Modifier.offset(y = -CardLift)) {
+                        if (prefs.nowPlayingStyle == NowPlayingStyle.CIRCLE) {
+                            CircularCard(song = song, controller = controller, side = side, isPlaying = state.isPlaying)
+                        } else {
+                            // Same footprint as the circular card (its art sits inside the ring's inset).
+                            AudioArt(
+                                contentUri = song.contentUri,
+                                modifier = Modifier.size(side - RingInset * 2).clip(RoundedCornerShape(36.dp)),
+                                iconSize = 64.dp
+                            )
+                        }
                     }
                 }
 
