@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The Pteron player logo (round badge with the camera / play mark), used in the Library header. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android" xmlns:aapt="http://schemas.android.com/aapt" android:width="64dp" android:height="64dp" android:viewportWidth="512" android:viewportHeight="512">
-    <path android:fillColor="#E6D3BC" android:pathData="M0,256 a256,256 0 1,0 512,0 a256,256 0 1,0 -512,0" />
-    <path android:fillColor="#00000000" android:strokeColor="#C4AB8F" android:strokeAlpha="0.55" android:strokeWidth="1.5"
+    <path android:fillColor="#F0E3D1" android:pathData="M0,256 a256,256 0 1,0 512,0 a256,256 0 1,0 -512,0" />
+    <path android:fillColor="#00000000" android:strokeColor="#D6C4AB" android:strokeAlpha="0.55" android:strokeWidth="1.5"
         android:pathData="M2,256 a254,254 0 1,0 508,0 a254,254 0 1,0 -508,0" />
     <group android:pivotX="256" android:pivotY="243" android:scaleX="3.0" android:scaleY="3.0" android:translateY="10">
         <group android:translateX="-3.5" android:translateY="11">
