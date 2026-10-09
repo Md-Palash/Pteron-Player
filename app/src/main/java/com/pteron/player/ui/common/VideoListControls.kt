@@ -115,7 +115,7 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
         borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AnimatedVisibility(
@@ -130,7 +130,7 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
                     modifier = Modifier.padding(end = 4.dp).size(14.dp)
                 )
             }
-            Text(label, style = MaterialTheme.typography.labelMedium, color = content)
+            Text(label, style = MaterialTheme.typography.titleSmall, color = content)
         }
     }
 }
