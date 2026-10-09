@@ -1,7 +1,9 @@
 package com.pteron.player.navigation
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -34,6 +36,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.util.UnstableApi
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -61,6 +64,7 @@ import com.pteron.player.ui.settings.SettingsViewModel
 import com.pteron.player.ui.videos.VideosScreen
 import com.pteron.player.ui.videos.VideosViewModel
 import kotlinx.coroutines.launch
+import kotlin.math.sign
 
 /**
  * Standard single-top bottom-nav pattern: switching tabs pops back to the
@@ -86,13 +90,35 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  */
 // The incoming tab fades up from slightly smaller while the outgoing one fades quickly underneath,
 // so there is never an empty frame between the two (the old 50 ms delay showed the bare window).
-private val tabEnter = fadeIn(tween(220, easing = FastOutSlowInEasing)) +
-    scaleIn(tween(220, easing = FastOutSlowInEasing), initialScale = 0.97f)
-// No fade on the outgoing screen: it stays opaque underneath until the new one has covered it, which
-// avoids two translucent full-screen layers blending (the main cost of a crossfade).
-private val tabExit = ExitTransition.None
-private val tabPopEnter = tabEnter
-private val tabPopExit = tabExit
+private val tabFadeScaleEnter = fadeIn(tween(240, easing = FastOutSlowInEasing)) +
+    scaleIn(tween(240, easing = FastOutSlowInEasing), initialScale = 0.97f)
+
+private fun tabIndex(route: String?): Int = BottomNavDestination.entries.indexOfFirst { it.screen.route == route }
+
+/** -1 / +1 when moving between two bottom-bar tabs (left / right), 0 for anything else. */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabDirection(): Int {
+    val from = tabIndex(initialState.destination.route)
+    val to = tabIndex(targetState.destination.route)
+    return if (from < 0 || to < 0 || from == to) 0 else sign((to - from).toFloat()).toInt()
+}
+
+// Moving between tabs: the new tab slides in from the side of its icon while fading up, and the old
+// one drifts the other way while fading out, so the bar and the content read as one gesture.
+// Non-tab neighbours (coming back from a folder or the player) keep the plain fade + scale.
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): EnterTransition {
+    val dir = tabDirection()
+    if (dir == 0) return tabFadeScaleEnter
+    return slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { dir * it / 6 } +
+        fadeIn(tween(260, easing = FastOutSlowInEasing))
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): ExitTransition {
+    val dir = tabDirection()
+    // No fade for non-tab neighbours: the outgoing screen stays opaque until the new one covers it.
+    if (dir == 0) return ExitTransition.None
+    return slideOutHorizontally(tween(340, easing = FastOutSlowInEasing)) { -dir * it / 8 } +
+        fadeOut(tween(200, easing = FastOutSlowInEasing))
+}
 
 // The video surface cannot slide or fade with the rest of the screen, so a slide-out looked stuck.
 // Leaving the player is a short plain fade instead.
@@ -170,10 +196,10 @@ fun PteronNavGraph(
     NavHost(
         navController = navController,
         startDestination = Screen.Library.route,
-        enterTransition = { tabEnter },
-        exitTransition = { tabExit },
-        popEnterTransition = { tabPopEnter },
-        popExitTransition = { tabPopExit }
+        enterTransition = { tabEnterFor() },
+        exitTransition = { tabExitFor() },
+        popEnterTransition = { tabEnterFor() },
+        popExitTransition = { tabExitFor() }
     ) {
         composable(Screen.Library.route) {
             val viewModel: LibraryViewModel = viewModel(
