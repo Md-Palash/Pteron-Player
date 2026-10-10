@@ -25,12 +25,10 @@ private fun variableFamily(resId: Int): FontFamily = FontFamily(
     }
 )
 
-private val InterFamily = variableFamily(R.font.inter)
 private val RobotoFamily = variableFamily(R.font.roboto)
 private val OutfitFamily = variableFamily(R.font.outfit)
 private val PlayfairFamily = variableFamily(R.font.playfair)
 private val CinzelFamily = variableFamily(R.font.cinzel)
-private val PlaywriteFamily = variableFamily(R.font.playwrite)
 
 /** Lato is not a variable font: two static files, regular for the lighter weights, bold for the heavier ones. */
 private val LatoFamily = FontFamily(
@@ -43,14 +41,12 @@ private val LatoFamily = FontFamily(
 /** The Compose font family for a font choice. */
 fun AppFont.fontFamily(): FontFamily = when (this) {
     AppFont.SYSTEM -> FontFamily.Default
-    AppFont.INTER -> InterFamily
     AppFont.ROBOTO -> RobotoFamily
     AppFont.LATO -> LatoFamily
     AppFont.OUTFIT -> OutfitFamily
     AppFont.SERIF -> FontFamily.Serif
     AppFont.PLAYFAIR -> PlayfairFamily
     AppFont.CINZEL -> CinzelFamily
-    AppFont.PLAYWRITE -> PlaywriteFamily
 }
 
 private val defaultType = Typography()
@@ -65,7 +61,7 @@ private val defaultType = Typography()
  *  - labelLarge / labelMedium chips, buttons, counts
  *  - labelSmall     tiny badges and the small-caps line above a screen title
  */
-fun pteronTypography(font: AppFont): Typography {
+fun pteronTypography(font: AppFont, scale: Float = 1f): Typography {
     val family = font.fontFamily()
     fun TextStyle.styled(
         weight: FontWeight? = null,
@@ -79,7 +75,7 @@ fun pteronTypography(font: AppFont): Typography {
         lineHeight = lineHeight?.sp ?: this.lineHeight,
         letterSpacing = letterSpacing?.sp ?: this.letterSpacing
     )
-    return Typography(
+    val base = Typography(
         displayLarge = defaultType.displayLarge.styled(),
         displayMedium = defaultType.displayMedium.styled(),
         displaySmall = defaultType.displaySmall.styled(),
@@ -95,5 +91,24 @@ fun pteronTypography(font: AppFont): Typography {
         labelLarge = defaultType.labelLarge.styled(FontWeight.Medium, 13, 18),
         labelMedium = defaultType.labelMedium.styled(FontWeight.Medium, 12, 16),
         labelSmall = defaultType.labelSmall.styled(size = 10, lineHeight = 14, letterSpacing = 0.3f)
+    )
+    if (scale == 1f) return base
+    fun TextStyle.scaled() = copy(fontSize = fontSize * scale, lineHeight = lineHeight * scale)
+    return base.copy(
+        displayLarge = base.displayLarge.scaled(),
+        displayMedium = base.displayMedium.scaled(),
+        displaySmall = base.displaySmall.scaled(),
+        headlineLarge = base.headlineLarge.scaled(),
+        headlineMedium = base.headlineMedium.scaled(),
+        headlineSmall = base.headlineSmall.scaled(),
+        titleLarge = base.titleLarge.scaled(),
+        titleMedium = base.titleMedium.scaled(),
+        titleSmall = base.titleSmall.scaled(),
+        bodyLarge = base.bodyLarge.scaled(),
+        bodyMedium = base.bodyMedium.scaled(),
+        bodySmall = base.bodySmall.scaled(),
+        labelLarge = base.labelLarge.scaled(),
+        labelMedium = base.labelMedium.scaled(),
+        labelSmall = base.labelSmall.scaled()
     )
 }
