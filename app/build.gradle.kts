@@ -4,6 +4,20 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Release signing values come from environment variables (GitHub Actions) or from
+// app/keystore.properties (gitignored, for building on your own computer):
+//   storeFile=/absolute/path/to/pteron-release.jks
+//   storePassword=...
+//   keyAlias=...
+//   keyPassword=...
+val keystoreProps = java.util.Properties().apply {
+    val propsFile = rootProject.file("app/keystore.properties")
+    if (propsFile.exists()) propsFile.inputStream().use { load(it) }
+}
+
+fun signingValue(env: String, key: String): String? =
+    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keystoreProps.getProperty(key)
+
 android {
     namespace = "com.pteron.player"
     compileSdk = 37
@@ -22,24 +36,24 @@ android {
         localeFilters += "en"
     }
 
+    // The dependency list that Gradle normally embeds (encrypted) in every APK is only useful for
+    // Google Play's own tooling; leaving it out makes the APK a little smaller.
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     signingConfigs {
-        // Release signing is intentionally NOT hardcoded here.
-        // Create app/keystore.properties (gitignored) with:
-        //   storeFile=/absolute/path/to/pteron-release.jks
-        //   storePassword=...
-        //   keyAlias=...
-        //   keyPassword=...
-        // and uncomment the block below before building a release AAB.
-        //
-        // create("release") {
-        //     val props = java.util.Properties()
-        //     val propsFile = rootProject.file("app/keystore.properties")
-        //     if (propsFile.exists()) props.load(propsFile.inputStream())
-        //     storeFile = props["storeFile"]?.let { file(it) }
-        //     storePassword = props["storePassword"] as String?
-        //     keyAlias = props["keyAlias"] as String?
-        //     keyPassword = props["keyPassword"] as String?
-        // }
+        // Only created when a keystore is available, so a plain `assembleDebug` still works anywhere.
+        val storePath = signingValue("KEYSTORE_PATH", "storeFile")
+        if (storePath != null) {
+            create("release") {
+                storeFile = file(storePath)
+                storePassword = signingValue("KEYSTORE_PASSWORD", "storePassword")
+                keyAlias = signingValue("KEY_ALIAS", "keyAlias")
+                keyPassword = signingValue("KEY_PASSWORD", "keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -54,16 +68,15 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // signingConfig = signingConfigs.getByName("release")
+            // Signed with your own key when one is configured (this is the APK to install and share).
+            signingConfig = signingConfigs.findByName("release")
         }
-        // Mirrors `release` (minified + shrunk, so the size is realistic) but signed
-        // with the debug key so it installs on a device without a production
-        // keystore. Use this build type to actually measure/verify APK size --
-        // `assembleDebug` is never representative, since it isn't minified at all.
+        // Mirrors `release` (minified + shrunk, so the size is realistic). Signed with the release
+        // key when available, otherwise with the debug key so it still installs for size checks.
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             applicationIdSuffix = ".benchmark"
             isDebuggable = false
         }
