@@ -15,7 +15,7 @@ private val Context.musicPrefsDataStore by preferencesDataStore(name = "music_pr
 
 /** Look of the full-screen Now Playing card. */
 enum class NowPlayingStyle(val displayName: String) {
-    CIRCLE("Circular"),
+    CIRCLE("Round"),
     SQUARE("Square")
 }
 

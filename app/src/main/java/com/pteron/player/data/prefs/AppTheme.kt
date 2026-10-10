@@ -60,14 +60,12 @@ enum class AppTheme(
  */
 enum class AppFont(val displayName: String) {
     SYSTEM("System default"),
-    INTER("Inter"),
     ROBOTO("Roboto"),
     LATO("Lato"),
     OUTFIT("Outfit"),
     SERIF("Serif"),
     PLAYFAIR("Playfair Display"),
-    CINZEL("Cinzel"),
-    PLAYWRITE("Playwrite");
+    CINZEL("Cinzel");
 
     companion object {
         val DEFAULT = SYSTEM
