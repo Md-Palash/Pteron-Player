@@ -304,7 +304,7 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
             label,
             style = MaterialTheme.typography.titleSmall,
             color = content,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp)
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)
         )
     }
 }
@@ -325,11 +325,11 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
     PteronClickableCard(
         onClick = onOpen,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(30.dp),
+        shape = RoundedCornerShape(percent = 50),
         color = scheme.surfaceContainerHighest
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 14.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {

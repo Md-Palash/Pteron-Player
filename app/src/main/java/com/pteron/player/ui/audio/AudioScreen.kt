@@ -1,7 +1,9 @@
 package com.pteron.player.ui.audio
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -60,6 +62,9 @@ import com.pteron.player.ui.library.PermissionUiState
 import com.pteron.player.ui.playlists.PlaylistNameDialog
 import com.pteron.player.util.TabReselect
 
+/** The notification permission is only asked once per app launch. */
+private var audioNotificationAsked = false
+
 private val TabLabels = listOf("Home", "Library", "Playlist", "Artist", "Favorite")
 private const val TAB_HOME = 0
 private const val TAB_LIBRARY = 1
@@ -95,6 +100,22 @@ fun AudioScreen(
         android.content.pm.PackageManager.PERMISSION_GRANTED
     LaunchedEffect(Unit) {
         if (alreadyGranted) viewModel.onPermissionResult(true, true) else permissionLauncher.launch(audioLibraryPermission)
+    }
+
+    // Without POST_NOTIFICATIONS (Android 13+) the system never shows the music notification or the
+    // lock-screen card. Asked once, right after the music permission was granted (two permission
+    // dialogs at the same moment would cancel each other).
+    val notificationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { }
+    LaunchedEffect(state.permission) {
+        if (state.permission == PermissionUiState.GRANTED &&
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !audioNotificationAsked &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            audioNotificationAsked = true
+            notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
     }
 
     var tab by rememberSaveable { mutableStateOf(TAB_HOME) }

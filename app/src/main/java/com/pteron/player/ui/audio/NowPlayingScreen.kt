@@ -6,7 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.view.WindowManager
-import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -17,13 +17,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.GenericShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -40,8 +43,8 @@ import androidx.compose.material.icons.rounded.FastForward
 import androidx.compose.material.icons.rounded.FastRewind
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -57,6 +60,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -64,16 +68,19 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pteron.player.data.model.AudioItem
 import com.pteron.player.data.prefs.NowPlayingStyle
 import com.pteron.player.playback.AudioPlayerController
-import com.pteron.player.ui.common.TwoLineTitle
+import com.pteron.player.playback.AudioPlayerState
+import com.pteron.player.theme.LocalThemeColors
 import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.ui.player.RepeatMode
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.pteron.player.util.formatTimecode
 import kotlin.math.PI
 import kotlin.math.cos
@@ -81,19 +88,17 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
 
-/** Waves around the whole ring, and how tall they are. */
-private const val RingWaves = 22
-private val RingWaveAmplitude = 3.dp
-private val RingStroke = 5.dp
-
-/** How far the card sits above the centre of its band. */
-private val CardLift = 24.dp
+private val White70 = Color.White.copy(alpha = 0.70f)
+private val HeartTint = Color(0xFFFF8A9B)
 
 /**
- * Full-screen music player. The screen is laid out in fixed bands so it looks the same on every
- * phone: the top 20% is empty (the header lives there), the middle 70% holds the card, the
- * title row, the seek bar and the controls, and the bottom 10% stays empty. Everything inside the
- * 70% band is sized from the room it gets, keeping the same proportions.
+ * Full-screen music player. The whole screen is one card whose background color is taken from the
+ * song's cover, so the picture melts into the rest of the screen.
+ *
+ *  - Square style: the cover fills the top 60% and fades into the background; progress bar and
+ *    controls sit in the bottom 40%.
+ *  - Round style: header, time, a flower-shaped cover with a progress line around it, title,
+ *    seek bar and controls.
  */
 @Composable
 fun NowPlayingScreen(
@@ -104,8 +109,10 @@ fun NowPlayingScreen(
     val state by controller.state.collectAsState()
     val audioState by viewModel.uiState.collectAsState()
     val prefs by viewModel.musicPrefs.collectAsState()
-    val activity = LocalContext.current as? Activity
+    val context = LocalContext.current
+    val activity = context as? Activity
     val menu = remember { SongMenuState() }
+    val themeIsDark = LocalThemeColors.current.isDark
 
     val song = state.current
     // Nothing loaded (e.g. the queue was cleared): there is nothing to show here.
@@ -117,215 +124,287 @@ fun NowPlayingScreen(
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
+    // The screen is always dark, so the status / navigation bar icons must be light here,
+    // whatever theme the rest of the app uses.
+    DisposableEffect(themeIsDark) {
+        val window = activity?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        bars?.isAppearanceLightStatusBars = false
+        bars?.isAppearanceLightNavigationBars = false
+        onDispose {
+            bars?.isAppearanceLightStatusBars = !themeIsDark
+            bars?.isAppearanceLightNavigationBars = !themeIsDark
+        }
+    }
+
     if (song == null) return
-    val isFavorite = remember(audioState.songs, song.id) { audioState.songs.firstOrNull { it.id == song.id }?.isFavorite ?: false }
+
     val scheme = MaterialTheme.colorScheme
-    val context = LocalContext.current
+    val fallbackTint = remember(scheme.primary) { deepTint(scheme.primary) }
+    val tint by animateColorAsState(
+        targetValue = rememberArtTint(song.contentUri, fallbackTint),
+        animationSpec = tween(500),
+        label = "nowPlayingTint"
+    )
+    val isFavorite = remember(audioState.songs, song.id) {
+        audioState.songs.firstOrNull { it.id == song.id }?.isFavorite ?: false
+    }
+    val onFavorite: () -> Unit = { viewModel.toggleFavorite(song.copy(isFavorite = isFavorite)) }
+    val onShare: () -> Unit = { shareSong(context, song) }
+    val onAddToPlaylist: () -> Unit = { menu.addToPlaylist = song }
 
-    Scaffold { insets ->
-        BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(insets)
-                .background(scheme.background)
-        ) {
-            val screenHeight = maxHeight
-
-            // Header: inside the empty top band.
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(modifier = Modifier.padding(end = 8.dp).bouncyClickable(onClick = onBack)) {
-                    Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Back")
-                }
-                TwoLineTitle(subtitle = "PTERON PLAYER", title = "Now Playing")
-            }
-
-            // The 70% band: starts at 20% of the height, leaves 10% free underneath.
-            Column(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = screenHeight * 0.17f)
-                    .fillMaxWidth()
-                    .height(screenHeight * 0.74f)
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 1) The card.
-                BoxWithConstraints(modifier = Modifier.weight(0.60f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val side = min(maxWidth.value, maxHeight.value).dp
-                    // Only the card is lifted; the title row, seek bar and controls stay where they are.
-                    Box(modifier = Modifier.offset(y = -CardLift)) {
-                        if (prefs.nowPlayingStyle == NowPlayingStyle.CIRCLE) {
-                            CircularCard(song = song, controller = controller, side = side, isPlaying = state.isPlaying)
-                        } else {
-                            // Same footprint as the circular card (its art sits inside the ring's inset).
-                            AudioArt(
-                                contentUri = song.contentUri,
-                                modifier = Modifier.size(side - RingInset * 2).clip(RoundedCornerShape(36.dp)),
-                                iconSize = 64.dp
-                            )
-                        }
-                    }
-                }
-
-                // 2) Title and artist on the left, share / favorite / add-to-playlist on the right.
-                Row(
-                    modifier = Modifier.weight(0.12f).fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(song.title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(
-                            song.artist,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = scheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        SquareAction(Icons.Outlined.Share, "Share", false) { shareSong(context, song) }
-                        SquareAction(
-                            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
-                            description = "Favorite",
-                            active = isFavorite
-                        ) { viewModel.toggleFavorite(song.copy(isFavorite = isFavorite)) }
-                        SquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", false) { menu.addToPlaylist = song }
-                    }
-                }
-
-                // 3) Seek bar with the time labels.
-                SeekBar(controller = controller, durationMs = state.durationMs, modifier = Modifier.weight(0.10f).fillMaxWidth())
-
-                // 4) Controls: shuffle, previous, play/pause, next, repeat -- sizes step down from the middle.
-                BoxWithConstraints(modifier = Modifier.weight(0.18f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    val play = min(min(maxHeight.value * 0.95f, maxWidth.value / 4.3f), 88f).dp
-                    val mid = play * 0.66f
-                    val small = play * 0.48f
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        RoundControl(
-                            icon = Icons.Outlined.Shuffle, description = "Shuffle", size = small,
-                            container = scheme.surfaceContainer,
-                            tint = if (state.shuffle) scheme.primary else scheme.onSurfaceVariant,
-                            onClick = controller::toggleShuffle
-                        )
-                        RoundControl(
-                            icon = Icons.Rounded.FastRewind, description = "Previous", size = mid,
-                            container = scheme.primary.copy(alpha = 0.16f), tint = scheme.primary,
-                            onClick = controller::previous
-                        )
-                        RoundControl(
-                            icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                            description = if (state.isPlaying) "Pause" else "Play", size = play,
-                            container = scheme.primary, tint = scheme.onPrimary,
-                            onClick = controller::togglePlayPause
-                        )
-                        RoundControl(
-                            icon = Icons.Rounded.FastForward, description = "Next", size = mid,
-                            container = scheme.primary.copy(alpha = 0.16f), tint = scheme.primary,
-                            enabled = state.hasNext, onClick = controller::next
-                        )
-                        RoundControl(
-                            icon = if (state.repeat == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
-                            description = "Repeat: ${state.repeat.label}", size = small,
-                            container = scheme.surfaceContainer,
-                            tint = if (state.repeat == RepeatMode.OFF) scheme.onSurfaceVariant else scheme.primary,
-                            onClick = controller::cycleRepeat
-                        )
-                    }
-                }
-            }
+    Box(modifier = Modifier.fillMaxSize().background(tint)) {
+        if (prefs.nowPlayingStyle == NowPlayingStyle.SQUARE) {
+            SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+        } else {
+            RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
         }
     }
 
     SongMenuHost(menu = menu, viewModel = viewModel, controller = controller, playlists = audioState.playlists)
 }
 
-// --- Circular card with the wavy progress ring ---------------------------------------------------
-
-private val RingInset = 12.dp
+// --- Square style: cover on the top 60%, controls on the bottom 40% -----------------------------
 
 @Composable
-private fun CircularCard(song: AudioItem, controller: AudioPlayerController, side: Dp, isPlaying: Boolean) {
-    val scheme = MaterialTheme.colorScheme
-    val positionState = controller.positionMs.collectAsStateWithLifecycle()
-    val durationState = controller.state.collectAsState()
-
-    // Smooths the 500 ms position ticks so the ring grows continuously. Read only while drawing.
-    val target = run {
-        val d = durationState.value.durationMs.coerceAtLeast(1L)
-        (positionState.value.toFloat() / d.toFloat()).coerceIn(0f, 1f)
-    }
-    val progress = animateFloatAsState(target, tween(500, easing = LinearEasing), label = "ringProgress")
-
-    // The waves drift only while music plays.
-    val phase = remember { Animatable(0f) }
-    LaunchedEffect(isPlaying) {
-        if (isPlaying) {
-            while (true) {
-                phase.animateTo(phase.value + 2f * PI.toFloat(), tween(2600, easing = LinearEasing))
-            }
+private fun SquareLayout(
+    song: AudioItem,
+    state: AudioPlayerState,
+    controller: AudioPlayerController,
+    tint: Color,
+    isFavorite: Boolean,
+    onBack: () -> Unit,
+    onFavorite: () -> Unit,
+    onShare: () -> Unit,
+    onAddToPlaylist: () -> Unit
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(modifier = Modifier.fillMaxWidth().weight(0.6f)) {
+            AudioArt(song.contentUri, Modifier.fillMaxSize(), iconSize = 96.dp)
+            // Keeps the header buttons readable on a bright cover.
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
+            )
+            // The blend: the cover fades into the screen's own color, so there is no edge.
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.5f)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, tint.copy(alpha = 0.6f), tint)))
+            )
+            NpHeader(isFavorite, onBack, onFavorite, Modifier.align(Alignment.TopCenter).statusBarsPadding())
         }
-    }
-
-    val track = scheme.outlineVariant.copy(alpha = 0.6f)
-    val accent = scheme.primary
-
-    Box(modifier = Modifier.size(side), contentAlignment = Alignment.Center) {
-        AudioArt(
-            contentUri = song.contentUri,
-            modifier = Modifier.size(side - RingInset * 2).clip(CircleShape),
-            iconSize = 64.dp
-        )
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val strokePx = RingStroke.toPx()
-            val amp = RingWaveAmplitude.toPx()
-            val radius = size.minDimension / 2f - amp - strokePx / 2f
-            val center = Offset(size.width / 2f, size.height / 2f)
-
-            drawCircle(color = track, radius = radius, center = center, style = Stroke(width = strokePx * 0.6f))
-
-            val p = progress.value
-            if (p > 0.002f) {
-                val sweep = 2f * PI.toFloat() * p
-                val steps = max(8, (p * 360f).toInt())
-                val path = Path()
-                var endX = 0f
-                var endY = 0f
-                for (i in 0..steps) {
-                    val t = sweep * i / steps
-                    val angle = -PI.toFloat() / 2f + t
-                    // The wave fades in over the first bit of the arc so the start is a clean point.
-                    val r = radius + amp * sin(RingWaves * t + phase.value)
-                    val x = center.x + r * cos(angle)
-                    val y = center.y + r * sin(angle)
-                    if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
-                    endX = x
-                    endY = y
+        Column(
+            modifier = Modifier
+                .weight(0.4f)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 8.dp),
+            verticalArrangement = Arrangement.SpaceEvenly
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(song.title, style = MaterialTheme.typography.titleLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = White70, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                drawPath(
-                    path = path,
-                    color = accent,
-                    style = Stroke(width = strokePx, cap = StrokeCap.Round, join = StrokeJoin.Round)
-                )
-                drawCircle(color = accent, radius = strokePx * 1.2f, center = Offset(endX, endY))
+                NpSquareAction(Icons.Outlined.Share, "Share", onShare)
+                NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
             }
+            NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth())
+            NpTransport(state, controller, tint, Modifier.fillMaxWidth())
         }
     }
 }
 
-// --- Seek bar --------------------------------------------------------------------------------------
+// --- Round style: flower-shaped cover with a progress line --------------------------------------
 
 @Composable
-private fun SeekBar(controller: AudioPlayerController, durationMs: Long, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
+private fun RoundLayout(
+    song: AudioItem,
+    state: AudioPlayerState,
+    controller: AudioPlayerController,
+    tint: Color,
+    isFavorite: Boolean,
+    onBack: () -> Unit,
+    onFavorite: () -> Unit,
+    onShare: () -> Unit,
+    onAddToPlaylist: () -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        NpHeader(isFavorite, onBack, onFavorite)
+        NpTimeLabel(controller, state.durationMs)
+
+        BoxWithConstraints(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val side = min(maxWidth.value, maxHeight.value).dp
+            FlowerCard(song, controller, side, state.durationMs)
+        }
+
+        Column(modifier = Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                song.title, style = MaterialTheme.typography.titleLarge, color = Color.White,
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                song.artist, style = MaterialTheme.typography.bodyMedium, color = White70,
+                textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
+            )
+        }
+        NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth().padding(horizontal = 24.dp))
+        NpTransport(state, controller, tint, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+            NpSquareAction(Icons.Outlined.Share, "Share", onShare)
+            NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
+        }
+    }
+}
+
+/** Petals around the cover and its progress line. */
+private const val Lobes = 8
+private val RingInset = 22.dp
+
+/** Points of the flower outline from [startAngle] over [sweep] radians (0 deg = right, clockwise). */
+private fun flowerPath(cx: Float, cy: Float, base: Float, amp: Float, startAngle: Float, sweep: Float, steps: Int): Path {
+    val path = Path()
+    for (i in 0..steps) {
+        val t = startAngle + sweep * i / steps
+        val r = base + amp * cos(Lobes * t)
+        val x = cx + r * cos(t)
+        val y = cy + r * sin(t)
+        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+    }
+    return path
+}
+
+/** The cover is clipped to this flower. */
+private val FlowerShape = GenericShape { size, _ ->
+    val half = size.minDimension / 2f
+    addPath(flowerPath(size.width / 2f, size.height / 2f, half * 0.94f, half * 0.06f, -PI.toFloat() / 2f, 2f * PI.toFloat(), 240))
+    close()
+}
+
+@Composable
+private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side: Dp, durationMs: Long) {
+    val position = controller.positionMs.collectAsStateWithLifecycle()
+    val target = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
+    // Smooths the 500 ms position ticks so the line grows continuously.
+    val progress = animateFloatAsState(target, tween(500, easing = LinearEasing), label = "ringProgress")
+
+    Box(modifier = Modifier.size(side), contentAlignment = Alignment.Center) {
+        AudioArt(
+            contentUri = song.contentUri,
+            modifier = Modifier.size(side - RingInset * 2).clip(FlowerShape),
+            iconSize = 64.dp
+        )
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val half = size.minDimension / 2f
+            val amp = 5.dp.toPx()
+            val base = half - amp - 2.dp.toPx()
+            val cx = size.width / 2f
+            val cy = size.height / 2f
+            val start = -PI.toFloat() / 2f
+            val full = 2f * PI.toFloat()
+
+            drawPath(
+                flowerPath(cx, cy, base, amp, start, full, 240),
+                color = Color.White.copy(alpha = 0.28f),
+                style = Stroke(width = 1.5.dp.toPx())
+            )
+            val p = progress.value
+            if (p > 0.002f) {
+                drawPath(
+                    flowerPath(cx, cy, base, amp, start, full * p, max(8, (p * 240).toInt())),
+                    color = Color.White,
+                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
+            }
+            val t = start + full * p
+            val r = base + amp * cos(Lobes * t)
+            drawCircle(Color.White, radius = 6.dp.toPx(), center = Offset(cx + r * cos(t), cy + r * sin(t)))
+        }
+    }
+}
+
+// --- Shared pieces -------------------------------------------------------------------------------
+
+@Composable
+private fun NpHeader(isFavorite: Boolean, onBack: () -> Unit, onFavorite: () -> Unit, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        NpCircleButton(Icons.AutoMirrored.Outlined.ArrowBack, "Back", false, onBack)
+        Text(
+            "Now Playing",
+            style = MaterialTheme.typography.titleMedium,
+            color = Color.White,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.weight(1f)
+        )
+        NpCircleButton(
+            icon = if (isFavorite) Icons.Filled.Favorite else Icons.Outlined.FavoriteBorder,
+            description = "Favorite",
+            active = isFavorite,
+            onClick = onFavorite
+        )
+    }
+}
+
+@Composable
+private fun NpCircleButton(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .clip(CircleShape)
+            .bouncyClickable(pressedScale = 0.92f, onClick = onClick)
+            .background(Color.White.copy(alpha = 0.16f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = description, tint = if (active) HeartTint else Color.White, modifier = Modifier.size(22.dp))
+    }
+}
+
+@Composable
+private fun NpSquareAction(icon: ImageVector, description: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .bouncyClickable(pressedScale = 0.92f, onClick = onClick)
+            .background(Color.White.copy(alpha = 0.14f)),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(22.dp))
+    }
+}
+
+/** "01:23 | 03:40" under the header of the round style. */
+@Composable
+private fun NpTimeLabel(controller: AudioPlayerController, durationMs: Long) {
+    val position = controller.positionMs.collectAsStateWithLifecycle()
+    Row(
+        modifier = Modifier.padding(top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Text(formatTimecode(position.value), style = MaterialTheme.typography.titleMedium, color = Color.White)
+        Text("  |  ", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.4f))
+        Text(formatTimecode(durationMs), style = MaterialTheme.typography.titleMedium, color = White70)
+    }
+}
+
+@Composable
+private fun NpSeekBar(controller: AudioPlayerController, durationMs: Long, modifier: Modifier = Modifier) {
     val position: State<Long> = controller.positionMs.collectAsStateWithLifecycle()
     var dragging by remember { mutableStateOf(false) }
     var dragValue by remember { mutableFloatStateOf(0f) }
@@ -343,41 +422,60 @@ private fun SeekBar(controller: AudioPlayerController, durationMs: Long, modifie
                 controller.seekTo(dragValue.toLong())
                 dragging = false
             },
-            valueRange = 0f..duration.toFloat()
+            valueRange = 0f..duration.toFloat(),
+            colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = Color.White,
+                inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+            )
         )
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTimecode(shown), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
-            Text(formatTimecode(duration), style = MaterialTheme.typography.labelMedium, color = scheme.onSurfaceVariant)
+            Text(formatTimecode(shown), style = MaterialTheme.typography.labelMedium, color = White70)
+            Text(formatTimecode(duration), style = MaterialTheme.typography.labelMedium, color = White70)
         }
     }
 }
 
-// --- Buttons ---------------------------------------------------------------------------------------
-
-/** Square button with rounded corners (share / favorite / add to playlist). */
+/** Shuffle, previous, play / pause, next, repeat. The play button is white with the screen color as its icon. */
 @Composable
-private fun SquareAction(icon: ImageVector, description: String, active: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(RoundedCornerShape(14.dp))
-            .background(if (active) scheme.primary.copy(alpha = 0.16f) else scheme.surfaceContainer)
-            .bouncyClickable(pressedScale = 0.92f, onClick = onClick),
-        contentAlignment = Alignment.Center
+private fun NpTransport(state: AudioPlayerState, controller: AudioPlayerController, tint: Color, modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = if (active) scheme.primary else scheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp)
+        NpRoundControl(
+            Icons.Outlined.Shuffle, "Shuffle", 42.dp,
+            container = Color.White.copy(alpha = if (state.shuffle) 0.30f else 0.10f),
+            tint = if (state.shuffle) Color.White else White70,
+            onClick = controller::toggleShuffle
+        )
+        NpRoundControl(
+            Icons.Rounded.FastRewind, "Previous", 52.dp,
+            container = Color.White.copy(alpha = 0.16f), tint = Color.White, onClick = controller::previous
+        )
+        NpRoundControl(
+            if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            if (state.isPlaying) "Pause" else "Play", 72.dp,
+            container = Color.White, tint = tint, onClick = controller::togglePlayPause
+        )
+        NpRoundControl(
+            Icons.Rounded.FastForward, "Next", 52.dp,
+            container = Color.White.copy(alpha = 0.16f), tint = Color.White,
+            enabled = state.hasNext, onClick = controller::next
+        )
+        NpRoundControl(
+            if (state.repeat == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
+            "Repeat: ${state.repeat.label}", 42.dp,
+            container = Color.White.copy(alpha = if (state.repeat == RepeatMode.OFF) 0.10f else 0.30f),
+            tint = if (state.repeat == RepeatMode.OFF) White70 else Color.White,
+            onClick = controller::cycleRepeat
         )
     }
 }
 
-/** Round transport button; the icon is half the button's diameter. */
 @Composable
-private fun RoundControl(
+private fun NpRoundControl(
     icon: ImageVector,
     description: String,
     size: Dp,
@@ -390,8 +488,8 @@ private fun RoundControl(
         modifier = Modifier
             .size(size)
             .clip(CircleShape)
-            .background(container)
-            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick),
+            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick)
+            .background(container),
         contentAlignment = Alignment.Center
     ) {
         Icon(
