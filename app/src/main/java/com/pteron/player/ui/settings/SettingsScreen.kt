@@ -1172,7 +1172,7 @@ private fun NowPlayingStyleCard(prefs: MusicPrefsState, viewModel: SettingsViewM
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text("Card style", style = MaterialTheme.typography.titleSmall)
             Text(
-                "Circular shows the cover in a circle with a wavy progress ring around it. Square shows it as a rounded square without the ring.",
+                "Round shows the cover in a flower-shaped frame with a progress line around it. Square shows a full-screen card: the cover on the top 60% and the controls below.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
