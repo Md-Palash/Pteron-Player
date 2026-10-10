@@ -264,6 +264,18 @@ fun PlayerScreen(
         }
     }
 
+    // HDR videos: switch the window to HDR color so highlights and colors are shown as mastered
+    // (on screens that support it); everything else stays in the normal color mode.
+    DisposableEffect(uiState.isHdr) {
+        val window = activity?.window
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            window?.colorMode = if (uiState.isHdr) ActivityInfo.COLOR_MODE_HDR else ActivityInfo.COLOR_MODE_DEFAULT
+        }
+        onDispose {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) window?.colorMode = ActivityInfo.COLOR_MODE_DEFAULT
+        }
+    }
+
     // Auto-hide controls after a few seconds of inactivity while playing. Also applies while
     // locked, where the only control on screen is the unlock button. Any touch on the controls
     // and any scrub in progress keep them up.

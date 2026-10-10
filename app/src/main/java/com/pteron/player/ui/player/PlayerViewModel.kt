@@ -88,7 +88,9 @@ data class PlayerUiState(
     /** Best-effort: null until a decoder has actually initialized for the current video. */
     val isHardwareDecoder: Boolean? = null,
     /** Video frame rate reported by the selected track's format, if any. */
-    val frameRate: Float? = null
+    val frameRate: Float? = null,
+    /** True while the selected video track is HDR (HDR10 / HLG): the window then switches to HDR color. */
+    val isHdr: Boolean = false
 )
 
 /** The fast-changing part of the player state (updated about once per second while visible). */
@@ -339,7 +341,8 @@ class PlayerViewModel(
                 _uiState.value = _uiState.value.copy(
                     audioTracks = buildTrackOptions(tracks, C.TRACK_TYPE_AUDIO),
                     subtitleTracks = subtitleOptions,
-                    frameRate = selectedVideoFrameRate(tracks) ?: _uiState.value.frameRate
+                    frameRate = selectedVideoFrameRate(tracks) ?: _uiState.value.frameRate,
+                    isHdr = selectedVideoIsHdr(tracks)
                 )
                 // Tracks arrive empty while a video is still preparing -- that must not be recorded as
                 // "no subtitles". And each (video, answer) pair is written once, not on every
@@ -409,6 +412,19 @@ class PlayerViewModel(
                 }
             }
         })
+    }
+
+    private fun selectedVideoIsHdr(tracks: Tracks): Boolean {
+        for (group in tracks.groups) {
+            if (group.type != C.TRACK_TYPE_VIDEO) continue
+            for (i in 0 until group.length) {
+                if (group.isTrackSelected(i)) {
+                    val transfer = group.getTrackFormat(i).colorInfo?.colorTransfer
+                    return transfer == C.COLOR_TRANSFER_ST2084 || transfer == C.COLOR_TRANSFER_HLG
+                }
+            }
+        }
+        return false
     }
 
     private fun selectedVideoFrameRate(tracks: Tracks): Float? {
