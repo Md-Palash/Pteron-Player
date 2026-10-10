@@ -7,19 +7,28 @@ import android.media.audiofx.BassBoost
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.net.Uri
+import android.os.Bundle
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.session.CacheBitmapLoader
+import androidx.media3.session.CommandButton
 import androidx.media3.session.MediaSession
+import androidx.media3.session.SessionCommand
+import androidx.media3.session.SessionResult
 import com.pteron.player.MainActivity
 import com.pteron.player.data.model.AudioItem
 import com.pteron.player.data.prefs.AudioStateRepository
 import com.pteron.player.data.prefs.MusicPrefsRepository
 import com.pteron.player.data.prefs.MusicPrefsState
+import com.google.common.collect.ImmutableList
+import com.google.common.util.concurrent.Futures
+import com.google.common.util.concurrent.ListenableFuture
 import com.pteron.player.ui.player.RepeatMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,6 +42,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+
+private const val ACTION_SHUFFLE = "pteron.SHUFFLE"
+private const val ACTION_REPEAT = "pteron.REPEAT"
 
 /** What the mini player and the Now Playing screen show. The position lives in [AudioPlayerController.positionMs]. */
 data class AudioPlayerState(
@@ -61,7 +73,14 @@ class AudioPlayerController(
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    val player: ExoPlayer = ExoPlayer.Builder(application)
+    // Float output keeps the full precision of the decoder all the way to the audio hardware
+    // (fewer rounding artifacts, best together with loudness boost); decoder fallback avoids
+    // errors on tracks the preferred decoder cannot start.
+    private val renderersFactory = DefaultRenderersFactory(application)
+        .setEnableAudioFloatOutput(true)
+        .setEnableDecoderFallback(true)
+
+    val player: ExoPlayer = ExoPlayer.Builder(application, renderersFactory)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -73,8 +92,43 @@ class AudioPlayerController(
         .build()
         .apply { setWakeMode(C.WAKE_MODE_LOCAL) }
 
+    // Shuffle and repeat buttons on the notification / lock-screen card.
+    private val shuffleCommand = SessionCommand(ACTION_SHUFFLE, Bundle.EMPTY)
+    private val repeatCommand = SessionCommand(ACTION_REPEAT, Bundle.EMPTY)
+
+    private val sessionCallback = object : MediaSession.Callback {
+        override fun onConnect(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo
+        ): MediaSession.ConnectionResult {
+            val commands = MediaSession.ConnectionResult.DEFAULT_SESSION_COMMANDS.buildUpon()
+                .add(shuffleCommand)
+                .add(repeatCommand)
+                .build()
+            return MediaSession.ConnectionResult.AcceptedResultBuilder(session)
+                .setAvailableSessionCommands(commands)
+                .build()
+        }
+
+        override fun onCustomCommand(
+            session: MediaSession,
+            controller: MediaSession.ControllerInfo,
+            customCommand: SessionCommand,
+            args: Bundle
+        ): ListenableFuture<SessionResult> {
+            when (customCommand.customAction) {
+                ACTION_SHUFFLE -> toggleShuffle()
+                ACTION_REPEAT -> cycleRepeat()
+            }
+            return Futures.immediateFuture(SessionResult(SessionResult.RESULT_SUCCESS))
+        }
+    }
+
     private val session: MediaSession = MediaSession.Builder(application, player)
         .setId("pteron_audio")
+        .setCallback(sessionCallback)
+        // Without this the notification has no cover: Media3 cannot open MediaStore audio Uris itself.
+        .setBitmapLoader(CacheBitmapLoader(AudioArtBitmapLoader(application)))
         .setSessionActivity(
             PendingIntent.getActivity(
                 application,
@@ -153,6 +207,29 @@ class AudioPlayerController(
         }
     }
 
+    private var buttonsShuffle = false
+    private var buttonsRepeat = -1
+
+    /** Keeps the shuffle / repeat buttons of the notification in step with the player. */
+    private fun updateNotificationButtons() {
+        val shuffleOn = player.shuffleModeEnabled
+        val repeatMode = player.repeatMode
+        if (buttonsShuffle == shuffleOn && buttonsRepeat == repeatMode) return
+        buttonsShuffle = shuffleOn
+        buttonsRepeat = repeatMode
+        val shuffleButton = CommandButton.Builder(
+            if (shuffleOn) CommandButton.ICON_SHUFFLE_ON else CommandButton.ICON_SHUFFLE_OFF
+        ).setDisplayName("Shuffle").setSessionCommand(shuffleCommand).build()
+        val repeatButton = CommandButton.Builder(
+            when (repeatMode) {
+                Player.REPEAT_MODE_ONE -> CommandButton.ICON_REPEAT_ONE
+                Player.REPEAT_MODE_ALL -> CommandButton.ICON_REPEAT_ALL
+                else -> CommandButton.ICON_REPEAT_OFF
+            }
+        ).setDisplayName("Repeat").setSessionCommand(repeatCommand).build()
+        session.setMediaButtonPreferences(ImmutableList.of(shuffleButton, repeatButton))
+    }
+
     // --- Commands ----------------------------------------------------------------------------------
 
     /** Replaces the queue with [songs] and starts playing at [startIndex]. */
@@ -223,6 +300,7 @@ class AudioPlayerController(
     // --- State -------------------------------------------------------------------------------------
 
     private fun publish() {
+        updateNotificationButtons()
         val current = player.currentMediaItem?.mediaId?.let { lookup[it] }
         val duration = player.duration
         _state.value = AudioPlayerState(
@@ -251,7 +329,7 @@ class AudioPlayerController(
                     .setTitle(song.title)
                     .setArtist(song.artist)
                     .setAlbumTitle(song.album)
-                    .setArtworkUri(Uri.parse(song.albumArtUri))
+                    .setArtworkUri(Uri.parse(song.contentUri))
                     .build()
             )
             .build()
