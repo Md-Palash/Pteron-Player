@@ -8,6 +8,13 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      # Repository secrets that hold your release key (Settings > Secrets and variables > Actions).
+      # While they are missing, only the debug and benchmark APKs are built, as before.
+      KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+      KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+      KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
@@ -59,12 +66,20 @@ jobs:
       - name: Build benchmark APK (minified, for real size measurement)
         run: ./gradlew assembleBenchmark --stacktrace
 
+      # The APK to install and share: minified, shrunk and signed with YOUR key. Android and Google
+      # Play Protect trust this far more than a debug-signed APK.
+      - name: Build signed release APK
+        if: env.KEYSTORE_BASE64 != ''
+        run: |
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          KEYSTORE_PATH="$RUNNER_TEMP/release.jks" ./gradlew assembleRelease --stacktrace
+
       - name: Report APK sizes
         run: |
           echo "### APK sizes" >> "$GITHUB_STEP_SUMMARY"
           echo "| Variant | Size |" >> "$GITHUB_STEP_SUMMARY"
           echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
-          for f in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/benchmark/*.apk; do
+          for f in app/build/outputs/apk/debug/*.apk app/build/outputs/apk/benchmark/*.apk app/build/outputs/apk/release/*.apk; do
             if [ -f "$f" ]; then
               size=$(du -h "$f" | cut -f1)
               echo "| $(basename "$f") | $size |" >> "$GITHUB_STEP_SUMMARY"
@@ -82,3 +97,10 @@ jobs:
         with:
           name: pteron-player-benchmark
           path: app/build/outputs/apk/benchmark/*.apk
+
+      - name: Upload signed release APK
+        if: env.KEYSTORE_BASE64 != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: pteron-player-release
+          path: app/build/outputs/apk/release/*.apk
