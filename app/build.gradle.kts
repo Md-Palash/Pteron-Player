@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // No org.jetbrains.kotlin.android here: Kotlin support is built into AGP 9.
@@ -10,7 +12,7 @@ plugins {
 //   storePassword=...
 //   keyAlias=...
 //   keyPassword=...
-val keystoreProps = java.util.Properties().apply {
+val keystoreProps = Properties().apply {
     val propsFile = rootProject.file("app/keystore.properties")
     if (propsFile.exists()) propsFile.inputStream().use { load(it) }
 }
