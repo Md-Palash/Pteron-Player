@@ -19,7 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.WindowCompat
 import com.pteron.player.data.prefs.AppTheme
@@ -184,7 +186,13 @@ fun PteronTheme(
         ThemeColors(animatedBackground, animatedCard, animatedAccent, animatedFolder, target.isDark)
     }
     val colorScheme = remember(colors) { colors.toColorScheme() }
+    // The text-size setting is applied to the density's font scale instead of to the type scale, so
+    // EVERY sp size in the app follows it (also dialogs, sheets and any text with a fixed size).
     val typography = remember(settings.font) { pteronTypography(settings.font) }
+    val baseDensity = LocalDensity.current
+    val density = remember(baseDensity, settings.fontScale) {
+        Density(baseDensity.density, baseDensity.fontScale * settings.fontScale)
+    }
 
     // The theme decides light or dark, not the phone: keep the status/navigation bar icons
     // readable, and paint the window itself so nothing flashes through during transitions.
@@ -199,7 +207,7 @@ fun PteronTheme(
         }
     }
 
-    CompositionLocalProvider(LocalThemeColors provides colors) {
+    CompositionLocalProvider(LocalThemeColors provides colors, LocalDensity provides density) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = typography,
