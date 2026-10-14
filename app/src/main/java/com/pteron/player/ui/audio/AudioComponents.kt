@@ -9,6 +9,7 @@ import androidx.compose.foundation.border
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Offset
@@ -287,7 +288,7 @@ fun SongCardRow(
 @Composable
 fun AudioTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         itemsIndexed(labels) { index, label -> AudioTab(label, index == selected) { onSelect(index) } }
@@ -299,9 +300,12 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
     val container by animateColorAsState(if (selected) scheme.primary else scheme.surfaceContainer, tween(180), label = "audioTabColor")
     val content by animateColorAsState(if (selected) scheme.onPrimary else scheme.onSurface, tween(180), label = "audioTabContent")
+    val pill = RoundedCornerShape(percent = 50)
     PteronClickableCard(
         onClick = onClick,
-        shape = RoundedCornerShape(percent = 50),
+        // Lifted off the screen so the tabs read as floating buttons, not a fixed header strip.
+        modifier = Modifier.pillowLift(pill, 6.dp),
+        shape = pill,
         color = container,
         borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
     ) {
@@ -364,7 +368,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
         onClick = onOpen,
         modifier = modifier.fillMaxWidth().pillowLift(shape),
         shape = shape,
-        color = scheme.surfaceContainerHighest
+        color = lerp(scheme.surfaceContainerHighest, Color.White, 0.18f)
     ) {
         // matchParentSize: the sheen must follow the card's own size, never stretch it.
         PillowSheen(shape, Modifier.matchParentSize())
@@ -373,7 +377,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            AudioArt(song.contentUri, Modifier.size(58.dp).clip(RoundedCornerShape(16.dp)), iconSize = 26.dp)
+            AudioArt(song.contentUri, Modifier.size(64.dp).clip(RoundedCornerShape(16.dp)), iconSize = 26.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(song.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -417,19 +421,26 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
     }
 }
 
-/** A thin progress line; the position is only read while drawing. */
+/** A thin progress line with a small solid dot at its front; the position is only read while drawing. */
 @Composable
 private fun MiniProgress(controller: AudioPlayerController, durationMs: Long) {
     val scheme = MaterialTheme.colorScheme
     val position = controller.positionMs.collectAsStateWithLifecycle()
     val track = scheme.outlineVariant.copy(alpha = 0.6f)
     val accent = scheme.primary
-    Box(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 4.dp)) {
-        Canvas(modifier = Modifier.fillMaxWidth().height(3.dp)) {
-            val radius = CornerRadius(size.height / 2f)
-            drawRoundRect(track, size = size, cornerRadius = radius)
+    Box(modifier = Modifier.fillMaxWidth().padding(top = 2.dp, end = 4.dp)) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(10.dp)) {
+            val thickness = 3.dp.toPx()
+            val dot = 4.dp.toPx()
+            val cy = size.height / 2f
+            val top = Offset(0f, cy - thickness / 2f)
+            val radius = CornerRadius(thickness / 2f)
             val p = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-            if (p > 0f) drawRoundRect(accent, size = Size(size.width * p, size.height), cornerRadius = radius)
+            // The dot stays fully inside the bar at both ends.
+            val x = dot + (size.width - 2f * dot) * p
+            drawRoundRect(track, topLeft = top, size = Size(size.width, thickness), cornerRadius = radius)
+            drawRoundRect(accent, topLeft = top, size = Size(x, thickness), cornerRadius = radius)
+            drawCircle(accent, radius = dot, center = Offset(x, cy))
         }
     }
 }
