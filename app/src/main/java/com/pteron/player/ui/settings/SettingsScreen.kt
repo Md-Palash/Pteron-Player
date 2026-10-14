@@ -706,7 +706,7 @@ private fun FontSizeSheet(selected: Float, font: AppFont, onSelect: (Float) -> U
                     "The quick brown fox jumps over the lazy dog.",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = font.fontFamily(),
-                        fontSize = (14f * preview / selected.coerceAtLeast(0.1f)).sp * selected
+                        fontSize = (14f * preview / selected.coerceAtLeast(0.1f)).sp
                     ),
                     modifier = Modifier.padding(16.dp)
                 )
@@ -728,7 +728,7 @@ private fun FontSizeSheet(selected: Float, font: AppFont, onSelect: (Float) -> U
                     ) {
                         Text(
                             label,
-                            style = MaterialTheme.typography.titleSmall.copy(fontSize = (14f * value / selected.coerceAtLeast(0.1f)).sp * selected),
+                            style = MaterialTheme.typography.titleSmall.copy(fontSize = (14f * value / selected.coerceAtLeast(0.1f)).sp),
                             color = content,
                             modifier = Modifier.weight(1f)
                         )
