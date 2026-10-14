@@ -5,6 +5,11 @@ import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.background
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -304,36 +309,71 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
             label,
             style = MaterialTheme.typography.titleSmall,
             color = content,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 26.dp, vertical = 8.dp)
         )
     }
 }
 
 // --- Mini player ------------------------------------------------------------------------------
 
+// --- "Pillow" look -----------------------------------------------------------------------------
+
+/** A soft, wide shadow that makes a card look lifted off the screen. Put it BEFORE any clip. */
+fun Modifier.pillowLift(shape: Shape, elevation: Dp = 14.dp): Modifier = this.shadow(
+    elevation = elevation,
+    shape = shape,
+    clip = false,
+    ambientColor = Color.Black.copy(alpha = 0.35f),
+    spotColor = Color.Black.copy(alpha = 0.45f)
+)
+
 /**
- * A wide rounded rectangle above the bottom bar: a rounded-square cover on the left, the title in
- * the middle and round previous / play-pause / next buttons on the right. Play-pause is the biggest
- * and the darkest (accent) one; previous and next are smaller and in a lighter tint of it.
- * Tapping the card opens Now Playing.
+ * The puffed-up surface of a pillow: a light sheen from the top-left, a soft shade towards the
+ * bottom-right and a thin lit edge. Draw it over (or under) the content of a card of the same [shape].
+ */
+@Composable
+fun PillowSheen(shape: Shape) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.linearGradient(
+                    listOf(Color.White.copy(alpha = 0.16f), Color.Transparent, Color.Black.copy(alpha = 0.14f))
+                ),
+                shape
+            )
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color.White.copy(alpha = 0.40f), Color.Transparent, Color.Black.copy(alpha = 0.18f))),
+                shape
+            )
+    )
+}
+
+/**
+ * A rounded rectangle above the bottom bar, lifted like a pillow: a rounded-square cover with a
+ * little padding around it on the left, title / artist / a thin progress line in the middle and
+ * round previous / play-pause / next buttons on the right. Tapping the card opens Now Playing.
  */
 @Composable
 fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     val song = state.current ?: return
     val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(24.dp)
     PteronClickableCard(
         onClick = onOpen,
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(percent = 50),
+        modifier = modifier.fillMaxWidth().pillowLift(shape),
+        shape = shape,
         color = scheme.surfaceContainerHighest
     ) {
+        PillowSheen(shape)
         Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            ProgressThumb(controller, song.contentUri, state.durationMs)
+            AudioArt(song.contentUri, Modifier.size(60.dp).clip(RoundedCornerShape(16.dp)), iconSize = 26.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(song.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -343,6 +383,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                MiniProgress(controller, state.durationMs)
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 MiniRoundButton(
@@ -357,7 +398,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                 MiniRoundButton(
                     icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     description = if (state.isPlaying) "Pause" else "Play",
-                    size = 56.dp,
+                    size = 52.dp,
                     container = scheme.primary,
                     tint = scheme.onPrimary,
                     onClick = controller::togglePlayPause
@@ -376,24 +417,19 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
     }
 }
 
-/** Round cover with a thin progress ring around it. The position is read only while drawing. */
+/** A thin progress line; the position is only read while drawing. */
 @Composable
-private fun ProgressThumb(controller: AudioPlayerController, contentUri: String, durationMs: Long) {
+private fun MiniProgress(controller: AudioPlayerController, durationMs: Long) {
     val scheme = MaterialTheme.colorScheme
     val position = controller.positionMs.collectAsStateWithLifecycle()
     val track = scheme.outlineVariant.copy(alpha = 0.6f)
     val accent = scheme.primary
-    Box(modifier = Modifier.size(58.dp), contentAlignment = Alignment.Center) {
-        AudioArt(contentUri, Modifier.size(46.dp).clip(CircleShape), iconSize = 22.dp)
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            val stroke = 3.dp.toPx()
-            val inset = stroke / 2f
-            val arcSize = Size(size.width - stroke, size.height - stroke)
-            drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke))
+    Box(modifier = Modifier.fillMaxWidth().padding(top = 6.dp, end = 4.dp)) {
+        Canvas(modifier = Modifier.fillMaxWidth().height(3.dp)) {
+            val radius = CornerRadius(size.height / 2f)
+            drawRoundRect(track, size = size, cornerRadius = radius)
             val p = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
-            if (p > 0f) {
-                drawArc(accent, -90f, 360f * p, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
-            }
+            if (p > 0f) drawRoundRect(accent, size = Size(size.width * p, size.height), cornerRadius = radius)
         }
     }
 }

@@ -87,6 +87,7 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 private val White70 = Color.White.copy(alpha = 0.70f)
 private val HeartTint = Color(0xFFFF8A9B)
@@ -164,7 +165,7 @@ fun NowPlayingScreen(
     SongMenuHost(menu = menu, viewModel = viewModel, controller = controller, playlists = audioState.playlists)
 }
 
-// --- Square style: cover on the top 60%, controls on the bottom 40% -----------------------------
+// --- Square style: a lifted square cover, controls underneath -----------------------------------
 
 @Composable
 private fun SquareLayout(
@@ -178,34 +179,28 @@ private fun SquareLayout(
     onShare: () -> Unit,
     onAddToPlaylist: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.fillMaxWidth().weight(0.6f)) {
-            AudioArt(song.contentUri, Modifier.fillMaxSize(), iconSize = 96.dp)
-            // Keeps the header buttons readable on a bright cover.
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(140.dp)
-                    .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
-            )
-            // The blend: the cover fades into the screen's own color, so there is no edge.
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.5f)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, tint.copy(alpha = 0.6f), tint)))
-            )
-            NpHeader(isFavorite, onBack, onFavorite, Modifier.align(Alignment.TopCenter).statusBarsPadding())
+    Column(
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 8.dp)
+    ) {
+        NpHeader(isFavorite, onBack, onFavorite)
+
+        // The cover is the biggest square that fits the free space (with a margin), so it can
+        // never run off the screen on any phone or orientation.
+        BoxWithConstraints(
+            modifier = Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp, vertical = 16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            val side = min(maxWidth.value, maxHeight.value).dp
+            val shape = RoundedCornerShape(32.dp)
+            Box(modifier = Modifier.size(side).pillowLift(shape, 24.dp).clip(shape)) {
+                AudioArt(song.contentUri, Modifier.fillMaxSize(), iconSize = 96.dp)
+                PillowSheen(shape)
+            }
         }
+
         Column(
-            modifier = Modifier
-                .weight(0.4f)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 8.dp),
-            verticalArrangement = Arrangement.SpaceEvenly
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
@@ -271,17 +266,45 @@ private fun RoundLayout(
 
 /** Petals around the cover and its progress line. */
 private const val Lobes = 8
-private val RingInset = 22.dp
 
-/** Points of the flower outline from [startAngle] over [sweep] radians (0 deg = right, clockwise). */
-private fun flowerPath(cx: Float, cy: Float, base: Float, amp: Float, startAngle: Float, sweep: Float, steps: Int): Path {
+/** The cover's flower: radius = half * (CoverBase + CoverAmp * cos(Lobes * angle)). */
+private const val CoverBase = 0.94f
+private const val CoverAmp = 0.06f
+
+/** Distance between the cover's edge and the progress line, the same all the way around. */
+private val RingGap = 10.dp
+
+/** Space kept free around the cover: the gap plus room for the line and the progress dot. */
+private val RingInset = RingGap + 9.dp
+
+/**
+ * A point of the flower outline at [angle] (0 = right, clockwise). [offset] pushes the point
+ * outwards along the outline's own normal, so the offset curve keeps the same distance from the
+ * cover everywhere (a plain radial offset would be narrower on the slopes of the petals).
+ */
+private fun flowerPoint(cx: Float, cy: Float, base: Float, amp: Float, offset: Float, angle: Float): Offset {
+    val r = base + amp * cos(Lobes * angle)
+    var x = cx + r * cos(angle)
+    var y = cy + r * sin(angle)
+    if (offset != 0f) {
+        val dr = -amp * Lobes * sin(Lobes * angle)
+        val dx = dr * cos(angle) - r * sin(angle)
+        val dy = dr * sin(angle) + r * cos(angle)
+        val len = sqrt(dx * dx + dy * dy).coerceAtLeast(1e-3f)
+        x += offset * dy / len
+        y -= offset * dx / len
+    }
+    return Offset(x, y)
+}
+
+private fun flowerPath(
+    cx: Float, cy: Float, base: Float, amp: Float, offset: Float,
+    startAngle: Float, sweep: Float, steps: Int
+): Path {
     val path = Path()
     for (i in 0..steps) {
-        val t = startAngle + sweep * i / steps
-        val r = base + amp * cos(Lobes * t)
-        val x = cx + r * cos(t)
-        val y = cy + r * sin(t)
-        if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+        val p = flowerPoint(cx, cy, base, amp, offset, startAngle + sweep * i / steps)
+        if (i == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
     }
     return path
 }
@@ -289,7 +312,12 @@ private fun flowerPath(cx: Float, cy: Float, base: Float, amp: Float, startAngle
 /** The cover is clipped to this flower. */
 private val FlowerShape = GenericShape { size, _ ->
     val half = size.minDimension / 2f
-    addPath(flowerPath(size.width / 2f, size.height / 2f, half * 0.94f, half * 0.06f, -PI.toFloat() / 2f, 2f * PI.toFloat(), 240))
+    addPath(
+        flowerPath(
+            size.width / 2f, size.height / 2f, half * CoverBase, half * CoverAmp, 0f,
+            -PI.toFloat() / 2f, 2f * PI.toFloat(), 240
+        )
+    )
     close()
 }
 
@@ -307,30 +335,30 @@ private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side:
             iconSize = 64.dp
         )
         Canvas(modifier = Modifier.fillMaxSize()) {
-            val half = size.minDimension / 2f
-            val amp = 5.dp.toPx()
-            val base = half - amp - 2.dp.toPx()
+            // Exactly the cover's flower, pushed outwards by RingGap.
+            val coverHalf = size.minDimension / 2f - RingInset.toPx()
+            val base = coverHalf * CoverBase
+            val amp = coverHalf * CoverAmp
+            val gap = RingGap.toPx()
             val cx = size.width / 2f
             val cy = size.height / 2f
             val start = -PI.toFloat() / 2f
             val full = 2f * PI.toFloat()
 
             drawPath(
-                flowerPath(cx, cy, base, amp, start, full, 240),
+                flowerPath(cx, cy, base, amp, gap, start, full, 240),
                 color = Color.White.copy(alpha = 0.28f),
                 style = Stroke(width = 1.5.dp.toPx())
             )
             val p = progress.value
             if (p > 0.002f) {
                 drawPath(
-                    flowerPath(cx, cy, base, amp, start, full * p, max(8, (p * 240).toInt())),
+                    flowerPath(cx, cy, base, amp, gap, start, full * p, max(8, (p * 240).toInt())),
                     color = Color.White,
                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
             }
-            val t = start + full * p
-            val r = base + amp * cos(Lobes * t)
-            drawCircle(Color.White, radius = 6.dp.toPx(), center = Offset(cx + r * cos(t), cy + r * sin(t)))
+            drawCircle(Color.White, radius = 6.dp.toPx(), center = flowerPoint(cx, cy, base, amp, gap, start + full * p))
         }
     }
 }
