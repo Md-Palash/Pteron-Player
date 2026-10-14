@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.shadow
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -85,7 +86,7 @@ fun VideoListHeader(
 fun FilterCardsRow(active: VideoFilter, onSelect: (VideoFilter) -> Unit, modifier: Modifier = Modifier) {
     LazyRow(
         modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp),
+        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         items(VideoFilter.entries, key = { it.name }) { filter ->
@@ -108,9 +109,18 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
         animationSpec = tween(180),
         label = "filterCardContent"
     )
+    val pill = RoundedCornerShape(percent = 50)
     PteronClickableCard(
         onClick = onClick,
-        shape = RoundedCornerShape(percent = 50),
+        // Lifted off the screen so the filters read as floating buttons, not a fixed header strip.
+        modifier = Modifier.shadow(
+            elevation = 6.dp,
+            shape = pill,
+            clip = false,
+            ambientColor = Color.Black.copy(alpha = 0.35f),
+            spotColor = Color.Black.copy(alpha = 0.45f)
+        ),
+        shape = pill,
         color = container,
         borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
     ) {
