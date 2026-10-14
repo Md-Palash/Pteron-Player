@@ -51,31 +51,56 @@ private suspend fun extractTint(context: Context, contentUri: String): Color? = 
         .build()
     val result = context.imageLoader.execute(request) as? SuccessResult ?: return@runCatching null
     val bitmap = (result.drawable as? BitmapDrawable)?.bitmap ?: return@runCatching null
-    averageTint(bitmap)
+    dominantBackground(bitmap)
 }.getOrNull()
 
-/** Average of the picture's colors, with colorful pixels counting far more than grey ones. */
-private fun averageTint(bitmap: Bitmap): Color? {
+/**
+ * The Now Playing background, from the colour that covers the largest AREA of the cover:
+ *  - mostly black  -> (almost) black
+ *  - any other colour -> a lighter shade of that same colour (lighter than the picture itself)
+ * Pixels are sorted into black / light grey / grey / 12 hue families and the biggest group wins,
+ * so a small bright spot can never outvote a big dark area.
+ */
+private fun dominantBackground(bitmap: Bitmap): Color? {
     val w = bitmap.width
     val h = bitmap.height
     if (w <= 0 || h <= 0) return null
     val pixels = IntArray(w * h)
     bitmap.getPixels(pixels, 0, w, 0, 0, w, h)
-    var r = 0.0
-    var g = 0.0
-    var b = 0.0
-    var total = 0.0
+    val groups = 15
+    val count = IntArray(groups)
+    val sumR = DoubleArray(groups)
+    val sumG = DoubleArray(groups)
+    val sumB = DoubleArray(groups)
+    val hsl = FloatArray(3)
+    var total = 0
     for (p in pixels) {
-        val pr = (p shr 16) and 0xFF
-        val pg = (p shr 8) and 0xFF
-        val pb = p and 0xFF
-        val chroma = (max(pr, max(pg, pb)) - min(pr, min(pg, pb))) / 255.0
-        val weight = 0.05 + chroma * chroma
-        r += pr * weight
-        g += pg * weight
-        b += pb * weight
-        total += weight
+        if ((p ushr 24) < 128) continue
+        ColorUtils.colorToHSL(p, hsl)
+        val group = when {
+            hsl[2] < 0.14f -> 0
+            hsl[1] < 0.12f -> if (hsl[2] > 0.8f) 1 else 2
+            else -> 3 + ((hsl[0] / 30f).toInt() % 12)
+        }
+        count[group]++
+        sumR[group] += ((p shr 16) and 0xFF).toDouble()
+        sumG[group] += ((p shr 8) and 0xFF).toDouble()
+        sumB[group] += (p and 0xFF).toDouble()
+        total++
     }
-    if (total <= 0.0) return null
-    return deepTint(Color((r / total / 255.0).toFloat(), (g / total / 255.0).toFloat(), (b / total / 255.0).toFloat()))
+    if (total == 0) return null
+    var best = 0
+    for (g in 1 until groups) if (count[g] > count[best]) best = g
+    if (best == 0) return Color(0xFF0A0A0A)
+
+    val n = count[best].toDouble()
+    val avg = Color(
+        (sumR[best] / n / 255.0).toFloat(),
+        (sumG[best] / n / 255.0).toFloat(),
+        (sumB[best] / n / 255.0).toFloat()
+    )
+    ColorUtils.colorToHSL(avg.toArgb(), hsl)
+    if (best >= 3) hsl[1] = hsl[1].coerceAtMost(0.7f)
+    hsl[2] = (hsl[2] + 0.18f).coerceIn(0.38f, 0.9f)
+    return Color(ColorUtils.HSLToColor(hsl))
 }

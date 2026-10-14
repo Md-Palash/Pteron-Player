@@ -309,7 +309,7 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
             label,
             style = MaterialTheme.typography.titleSmall,
             color = content,
-            modifier = Modifier.padding(horizontal = 26.dp, vertical = 8.dp)
+            modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp)
         )
     }
 }
@@ -332,10 +332,9 @@ fun Modifier.pillowLift(shape: Shape, elevation: Dp = 14.dp): Modifier = this.sh
  * bottom-right and a thin lit edge. Draw it over (or under) the content of a card of the same [shape].
  */
 @Composable
-fun PillowSheen(shape: Shape) {
+fun PillowSheen(shape: Shape, modifier: Modifier = Modifier.fillMaxSize()) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
             .background(
                 Brush.linearGradient(
                     listOf(Color.White.copy(alpha = 0.16f), Color.Transparent, Color.Black.copy(alpha = 0.14f))
@@ -367,13 +366,14 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
         shape = shape,
         color = scheme.surfaceContainerHighest
     ) {
-        PillowSheen(shape)
+        // matchParentSize: the sheen must follow the card's own size, never stretch it.
+        PillowSheen(shape, Modifier.matchParentSize())
         Row(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 12.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            AudioArt(song.contentUri, Modifier.size(60.dp).clip(RoundedCornerShape(16.dp)), iconSize = 26.dp)
+            AudioArt(song.contentUri, Modifier.size(58.dp).clip(RoundedCornerShape(16.dp)), iconSize = 26.dp)
             Column(modifier = Modifier.weight(1f)) {
                 Text(song.title, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
@@ -398,7 +398,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                 MiniRoundButton(
                     icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
                     description = if (state.isPlaying) "Pause" else "Play",
-                    size = 52.dp,
+                    size = 56.dp,
                     container = scheme.primary,
                     tint = scheme.onPrimary,
                     onClick = controller::togglePlayPause

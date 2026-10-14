@@ -47,7 +47,9 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
@@ -79,6 +81,7 @@ import com.pteron.player.data.prefs.NowPlayingStyle
 import com.pteron.player.playback.AudioPlayerController
 import com.pteron.player.playback.AudioPlayerState
 import com.pteron.player.theme.LocalThemeColors
+import com.pteron.player.theme.readableOn
 import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.ui.player.RepeatMode
 import com.pteron.player.util.formatTimecode
@@ -89,7 +92,10 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-private val White70 = Color.White.copy(alpha = 0.70f)
+/** Colour of text and icons on the cover-coloured background: white on dark, near-black on light. */
+private val LocalNpContent = compositionLocalOf { Color.White }
+private val NpContent: Color @Composable get() = LocalNpContent.current
+private val NpContent70: Color @Composable get() = LocalNpContent.current.copy(alpha = 0.70f)
 private val HeartTint = Color(0xFFFF8A9B)
 
 /**
@@ -147,6 +153,16 @@ fun NowPlayingScreen(
         animationSpec = tween(500),
         label = "nowPlayingTint"
     )
+    val contentColor = readableOn(tint)
+    val lightBackground = contentColor != Color.White
+    // Dark status/navigation icons on a light background, light ones on a dark one.
+    DisposableEffect(lightBackground) {
+        val window = activity?.window
+        val bars = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
+        bars?.isAppearanceLightStatusBars = lightBackground
+        bars?.isAppearanceLightNavigationBars = lightBackground
+        onDispose { }
+    }
     val isFavorite = remember(audioState.songs, song.id) {
         audioState.songs.firstOrNull { it.id == song.id }?.isFavorite ?: false
     }
@@ -154,11 +170,13 @@ fun NowPlayingScreen(
     val onShare: () -> Unit = { shareSong(context, song) }
     val onAddToPlaylist: () -> Unit = { menu.addToPlaylist = song }
 
-    Box(modifier = Modifier.fillMaxSize().background(tint)) {
-        if (prefs.nowPlayingStyle == NowPlayingStyle.SQUARE) {
-            SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
-        } else {
-            RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+    CompositionLocalProvider(LocalNpContent provides contentColor) {
+        Box(modifier = Modifier.fillMaxSize().background(tint)) {
+            if (prefs.nowPlayingStyle == NowPlayingStyle.SQUARE) {
+                SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+            } else {
+                RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+            }
         }
     }
 
@@ -180,7 +198,7 @@ private fun SquareLayout(
     onAddToPlaylist: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 8.dp)
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 40.dp)
     ) {
         NpHeader(isFavorite, onBack, onFavorite)
 
@@ -204,8 +222,8 @@ private fun SquareLayout(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(song.title, style = MaterialTheme.typography.titleLarge, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = White70, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.title, style = MaterialTheme.typography.titleLarge, color = NpContent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = NpContent70, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 NpSquareAction(Icons.Outlined.Share, "Share", onShare)
                 NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
@@ -231,7 +249,7 @@ private fun RoundLayout(
     onAddToPlaylist: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 40.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         NpHeader(isFavorite, onBack, onFavorite)
@@ -247,11 +265,11 @@ private fun RoundLayout(
 
         Column(modifier = Modifier.padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                song.title, style = MaterialTheme.typography.titleLarge, color = Color.White,
+                song.title, style = MaterialTheme.typography.titleLarge, color = NpContent,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
             Text(
-                song.artist, style = MaterialTheme.typography.bodyMedium, color = White70,
+                song.artist, style = MaterialTheme.typography.bodyMedium, color = NpContent70,
                 textAlign = TextAlign.Center, maxLines = 1, overflow = TextOverflow.Ellipsis
             )
         }
@@ -323,6 +341,7 @@ private val FlowerShape = GenericShape { size, _ ->
 
 @Composable
 private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side: Dp, durationMs: Long) {
+    val content = NpContent
     val position = controller.positionMs.collectAsStateWithLifecycle()
     val target = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
     // Smooths the 500 ms position ticks so the line grows continuously.
@@ -347,18 +366,18 @@ private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side:
 
             drawPath(
                 flowerPath(cx, cy, base, amp, gap, start, full, 240),
-                color = Color.White.copy(alpha = 0.28f),
+                color = content.copy(alpha = 0.28f),
                 style = Stroke(width = 1.5.dp.toPx())
             )
             val p = progress.value
             if (p > 0.002f) {
                 drawPath(
                     flowerPath(cx, cy, base, amp, gap, start, full * p, max(8, (p * 240).toInt())),
-                    color = Color.White,
+                    color = content,
                     style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
                 )
             }
-            drawCircle(Color.White, radius = 6.dp.toPx(), center = flowerPoint(cx, cy, base, amp, gap, start + full * p))
+            drawCircle(content, radius = 6.dp.toPx(), center = flowerPoint(cx, cy, base, amp, gap, start + full * p))
         }
     }
 }
@@ -375,7 +394,7 @@ private fun NpHeader(isFavorite: Boolean, onBack: () -> Unit, onFavorite: () -> 
         Text(
             "Now Playing",
             style = MaterialTheme.typography.titleMedium,
-            color = Color.White,
+            color = NpContent,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f)
         )
@@ -395,10 +414,10 @@ private fun NpCircleButton(icon: ImageVector, description: String, active: Boole
             .size(44.dp)
             .clip(CircleShape)
             .bouncyClickable(pressedScale = 0.92f, onClick = onClick)
-            .background(Color.White.copy(alpha = 0.16f)),
+            .background(NpContent.copy(alpha = 0.16f)),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = description, tint = if (active) HeartTint else Color.White, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = description, tint = if (active) HeartTint else NpContent, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -409,10 +428,10 @@ private fun NpSquareAction(icon: ImageVector, description: String, onClick: () -
             .size(42.dp)
             .clip(RoundedCornerShape(14.dp))
             .bouncyClickable(pressedScale = 0.92f, onClick = onClick)
-            .background(Color.White.copy(alpha = 0.14f)),
+            .background(NpContent.copy(alpha = 0.14f)),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription = description, tint = Color.White, modifier = Modifier.size(22.dp))
+        Icon(icon, contentDescription = description, tint = NpContent, modifier = Modifier.size(22.dp))
     }
 }
 
@@ -425,9 +444,9 @@ private fun NpTimeLabel(controller: AudioPlayerController, durationMs: Long) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        Text(formatTimecode(position.value), style = MaterialTheme.typography.titleMedium, color = Color.White)
-        Text("  |  ", style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.4f))
-        Text(formatTimecode(durationMs), style = MaterialTheme.typography.titleMedium, color = White70)
+        Text(formatTimecode(position.value), style = MaterialTheme.typography.titleMedium, color = NpContent)
+        Text("  |  ", style = MaterialTheme.typography.bodyMedium, color = NpContent.copy(alpha = 0.4f))
+        Text(formatTimecode(durationMs), style = MaterialTheme.typography.titleMedium, color = NpContent70)
     }
 }
 
@@ -452,14 +471,14 @@ private fun NpSeekBar(controller: AudioPlayerController, durationMs: Long, modif
             },
             valueRange = 0f..duration.toFloat(),
             colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color.White,
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                thumbColor = NpContent,
+                activeTrackColor = NpContent,
+                inactiveTrackColor = NpContent.copy(alpha = 0.25f)
             )
         )
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(formatTimecode(shown), style = MaterialTheme.typography.labelMedium, color = White70)
-            Text(formatTimecode(duration), style = MaterialTheme.typography.labelMedium, color = White70)
+            Text(formatTimecode(shown), style = MaterialTheme.typography.labelMedium, color = NpContent70)
+            Text(formatTimecode(duration), style = MaterialTheme.typography.labelMedium, color = NpContent70)
         }
     }
 }
@@ -474,29 +493,29 @@ private fun NpTransport(state: AudioPlayerState, controller: AudioPlayerControll
     ) {
         NpRoundControl(
             Icons.Outlined.Shuffle, "Shuffle", 42.dp,
-            container = Color.White.copy(alpha = if (state.shuffle) 0.30f else 0.10f),
-            tint = if (state.shuffle) Color.White else White70,
+            container = NpContent.copy(alpha = if (state.shuffle) 0.30f else 0.10f),
+            tint = if (state.shuffle) NpContent else NpContent70,
             onClick = controller::toggleShuffle
         )
         NpRoundControl(
             Icons.Rounded.FastRewind, "Previous", 52.dp,
-            container = Color.White.copy(alpha = 0.16f), tint = Color.White, onClick = controller::previous
+            container = NpContent.copy(alpha = 0.16f), tint = NpContent, onClick = controller::previous
         )
         NpRoundControl(
             if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
             if (state.isPlaying) "Pause" else "Play", 72.dp,
-            container = Color.White, tint = tint, onClick = controller::togglePlayPause
+            container = NpContent, tint = tint, onClick = controller::togglePlayPause
         )
         NpRoundControl(
             Icons.Rounded.FastForward, "Next", 52.dp,
-            container = Color.White.copy(alpha = 0.16f), tint = Color.White,
+            container = NpContent.copy(alpha = 0.16f), tint = NpContent,
             enabled = state.hasNext, onClick = controller::next
         )
         NpRoundControl(
             if (state.repeat == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
             "Repeat: ${state.repeat.label}", 42.dp,
-            container = Color.White.copy(alpha = if (state.repeat == RepeatMode.OFF) 0.10f else 0.30f),
-            tint = if (state.repeat == RepeatMode.OFF) White70 else Color.White,
+            container = NpContent.copy(alpha = if (state.repeat == RepeatMode.OFF) 0.10f else 0.30f),
+            tint = if (state.repeat == RepeatMode.OFF) NpContent70 else NpContent,
             onClick = controller::cycleRepeat
         )
     }
