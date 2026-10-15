@@ -41,7 +41,8 @@ import com.pteron.player.ui.common.LoadingState
 import com.pteron.player.ui.common.NoSearchResultsState
 import com.pteron.player.ui.common.TopBarSortButton
 import com.pteron.player.ui.common.TwoLineTitle
-import com.pteron.player.ui.common.VideoListHeader
+import com.pteron.player.ui.common.FilterCardsRow
+import com.pteron.player.ui.common.FloatingPills
 import com.pteron.player.ui.folder.VideoGridTile
 import com.pteron.player.ui.folder.VideoListRow
 
@@ -94,13 +95,12 @@ fun VideosScreen(
                     }
                 }
 
-                VideoListHeader(
-                    activeFilter = uiState.activeFilter,
-                    onFilterSelected = viewModel::onFilterSelected,
-                    videoCount = visibleVideos.size
-                )
-
-                when {
+                
+                FloatingPills(
+ modifier = Modifier.fillMaxSize(),
+ pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
+ ) { topPadding ->
+when {
                     uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
                     uiState.isLoading && uiState.videos.isEmpty() -> LoadingState()
                     uiState.videos.isEmpty() -> EmptyLibraryState(onRefresh = viewModel::refresh)
@@ -108,7 +108,7 @@ fun VideosScreen(
                     else -> when (uiState.appearance.viewMode) {
                         ViewMode.GRID -> LazyVerticalGrid(
                             columns = GridCells.Fixed(uiState.appearance.videoGridColumns),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = BottomNavClearance),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 8.dp, bottom = BottomNavClearance),
                             horizontalArrangement = Arrangement.spacedBy(6.dp),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxSize()
@@ -126,7 +126,7 @@ fun VideosScreen(
                             }
                         }
                         ViewMode.LIST -> LazyColumn(
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = BottomNavClearance),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 8.dp, bottom = BottomNavClearance),
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
@@ -143,6 +143,7 @@ fun VideosScreen(
                         }
                     }
                 }
+ }
             }
         }
     }
