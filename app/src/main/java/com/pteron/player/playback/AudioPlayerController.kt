@@ -29,6 +29,7 @@ import com.pteron.player.data.prefs.MusicPrefsState
 import com.google.common.collect.ImmutableList
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import com.pteron.player.ui.audio.warmArtTint
 import com.pteron.player.ui.player.RepeatMode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -170,6 +171,10 @@ class AudioPlayerController(
                 mediaItem?.mediaId?.toLongOrNull()?.let { id ->
                     scope.launch { stateRepository.recordPlayed(id) }
                 }
+                // Work out the cover's Now Playing colour right away, so opening the big card is instant.
+                mediaItem?.mediaId?.let { lookup[it] }?.let { song ->
+                    scope.launch { warmArtTint(application, song.contentUri, timeoutMs = 2_000L) }
+                }
             }
         })
 
@@ -235,7 +240,7 @@ class AudioPlayerController(
     /** Replaces the queue with [songs] and starts playing at [startIndex]. */
     fun playQueue(songs: List<AudioItem>, startIndex: Int, shuffle: Boolean = false) {
         if (songs.isEmpty()) return
-        runCatching { application.startService(Intent(application, AudioSessionService::class.java)) }
+        ensureService()
         songs.forEach { lookup[it.id.toString()] = it }
         player.shuffleModeEnabled = shuffle
         player.setMediaItems(songs.map(::toMediaItem), startIndex.coerceIn(0, songs.lastIndex), 0L)
@@ -253,14 +258,33 @@ class AudioPlayerController(
         player.addMediaItem(player.currentMediaItemIndex + 1, toMediaItem(song))
     }
 
+    /**
+     * The service that owns the notification stops itself when the app is swiped away. Whenever
+     * music is started again it has to be running again, or the controls and notification are gone.
+     */
+    private fun ensureService() {
+        runCatching { application.startService(Intent(application, AudioSessionService::class.java)) }
+    }
+
+    /** Called when a screen showing the player appears again (e.g. returning to the app): re-reads the player. */
+    fun resync() {
+        if (player.mediaItemCount > 0 && player.playWhenReady) ensureService()
+        publish()
+    }
+
     fun togglePlayPause() {
         when {
             player.playbackState == Player.STATE_ENDED -> {
+                ensureService()
                 player.seekToDefaultPosition()
                 player.play()
             }
             player.playWhenReady -> player.pause()
-            else -> player.play()
+            else -> {
+                ensureService()
+                if (player.playbackState == Player.STATE_IDLE) player.prepare()
+                player.play()
+            }
         }
     }
 
