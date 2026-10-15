@@ -41,6 +41,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -55,28 +57,27 @@ import com.pteron.player.data.model.SortOption
 import com.pteron.player.data.model.VideoFilter
 
 /**
- * The controls above a list of videos: the filter cards (All, Unwatched, ...) and, underneath,
- * just the video count -- sorting itself now lives in the floating top-right icon row
- * ([TopBarSortButton]), shared across every screen instead of living inside this header.
+ * Lays [pills] over the top of [content] with no background of their own, so whatever scrolls
+ * underneath passes behind the floating buttons and disappears at the top edge of this area
+ * (right under the screen header). [content] receives the height of the pill row, to use as the
+ * top content padding of its list so the first item starts below the pills.
  */
 @Composable
-fun VideoListHeader(
-    activeFilter: VideoFilter,
-    onFilterSelected: (VideoFilter) -> Unit,
-    videoCount: Int,
-    modifier: Modifier = Modifier
+fun FloatingPills(
+    modifier: Modifier = Modifier,
+    pills: @Composable () -> Unit,
+    content: @Composable (topPadding: Dp) -> Unit
 ) {
-    Column(
-        modifier = modifier.padding(top = 4.dp, bottom = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        FilterCardsRow(active = activeFilter, onSelect = onFilterSelected)
-        Text(
-            text = if (videoCount == 1) "1 video" else "$videoCount videos",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
+    val density = LocalDensity.current
+    var pillsHeight by remember { mutableStateOf(0.dp) }
+    Box(modifier = modifier) {
+        content(pillsHeight)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .fillMaxWidth()
+                .onSizeChanged { pillsHeight = with(density) { it.height.toDp() } }
+        ) { pills() }
     }
 }
 
