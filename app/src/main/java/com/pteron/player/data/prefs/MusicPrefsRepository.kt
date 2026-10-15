@@ -34,7 +34,7 @@ data class MusicPrefsState(
     val pauseOnHeadphonesUnplugged: Boolean = true,
     val keepScreenOnInNowPlaying: Boolean = false,
     /** Jump to the Now Playing screen as soon as a song is started from a list. */
-    val openNowPlayingOnPlay: Boolean = false,
+    val openNowPlayingOnPlay: Boolean = true,
     val nowPlayingStyle: NowPlayingStyle = NowPlayingStyle.CIRCLE
 )
 
@@ -64,7 +64,7 @@ class MusicPrefsRepository(private val context: Context) {
             minTrackSeconds = p[Keys.MIN_TRACK_SECONDS] ?: 30,
             pauseOnHeadphonesUnplugged = p[Keys.PAUSE_ON_UNPLUG] ?: true,
             keepScreenOnInNowPlaying = p[Keys.KEEP_SCREEN_ON] ?: false,
-            openNowPlayingOnPlay = p[Keys.OPEN_NOW_PLAYING] ?: false,
+            openNowPlayingOnPlay = p[Keys.OPEN_NOW_PLAYING] ?: true,
             nowPlayingStyle = runCatching {
                 NowPlayingStyle.valueOf(p[Keys.NOW_PLAYING_STYLE] ?: NowPlayingStyle.CIRCLE.name)
             }.getOrDefault(NowPlayingStyle.CIRCLE)
