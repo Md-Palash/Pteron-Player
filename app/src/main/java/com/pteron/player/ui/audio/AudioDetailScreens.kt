@@ -34,7 +34,10 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -179,9 +182,15 @@ private fun SongsPage(
     // The row index of the song whose menu is open, so reorder actions know their position.
     var menuIndex by remember { mutableStateOf(0) }
 
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     fun play(index: Int, shuffle: Boolean) {
-        controller.playQueue(songs, index, shuffle)
-        if (prefs.openNowPlayingOnPlay) onOpenNowPlaying()
+        scope.launch {
+            // Read the cover's colour first, so the Now Playing screen opens already in its final colour.
+            if (prefs.openNowPlayingOnPlay) warmArtTint(context, songs.getOrNull(index)?.contentUri)
+            controller.playQueue(songs, index, shuffle)
+            if (prefs.openNowPlayingOnPlay) onOpenNowPlaying()
+        }
     }
 
     Scaffold { insets ->

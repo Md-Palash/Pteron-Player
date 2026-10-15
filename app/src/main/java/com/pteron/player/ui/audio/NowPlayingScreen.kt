@@ -65,6 +65,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -198,7 +199,7 @@ private fun SquareLayout(
     onAddToPlaylist: () -> Unit
 ) {
     Column(
-        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 40.dp)
+        modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 64.dp)
     ) {
         NpHeader(isFavorite, onBack, onFavorite)
 
@@ -229,7 +230,7 @@ private fun SquareLayout(
                 NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
             }
             NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth())
-            NpTransport(state, controller, tint, Modifier.fillMaxWidth())
+            NpTransport(state, controller, tint, Modifier.fillMaxWidth(), playSquare = true)
         }
     }
 }
@@ -274,8 +275,8 @@ private fun RoundLayout(
             )
         }
         NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth().padding(horizontal = 24.dp))
-        NpTransport(state, controller, tint, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        NpTransport(state, controller, tint, Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp), playSquare = false)
+        Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             NpSquareAction(Icons.Outlined.Share, "Share", onShare)
             NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
         }
@@ -483,39 +484,58 @@ private fun NpSeekBar(controller: AudioPlayerController, durationMs: Long, modif
     }
 }
 
-/** Shuffle, previous, play / pause, next, repeat. The play button is white with the screen color as its icon. */
+/**
+ * Shuffle, previous, play / pause, next, repeat. The play button takes the content color with the
+ * screen color as its icon. In the round card the play button is round and the other four are
+ * rounded squares; in the square card it is the other way round.
+ */
 @Composable
-private fun NpTransport(state: AudioPlayerState, controller: AudioPlayerController, tint: Color, modifier: Modifier = Modifier) {
+private fun NpTransport(
+    state: AudioPlayerState,
+    controller: AudioPlayerController,
+    tint: Color,
+    modifier: Modifier = Modifier,
+    playSquare: Boolean
+) {
+    val small = if (playSquare) 46.dp else 44.dp
+    val medium = if (playSquare) 58.dp else 56.dp
+    val big = if (playSquare) 84.dp else 80.dp
+    val playShape: Shape = if (playSquare) RoundedCornerShape(26.dp) else CircleShape
+    fun other(size: Dp): Shape = if (playSquare) CircleShape else RoundedCornerShape(size * 0.3f)
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.SpaceEvenly,
         verticalAlignment = Alignment.CenterVertically
     ) {
         NpRoundControl(
-            Icons.Outlined.Shuffle, "Shuffle", 42.dp,
+            Icons.Outlined.Shuffle, "Shuffle", small,
             container = NpContent.copy(alpha = if (state.shuffle) 0.30f else 0.10f),
             tint = if (state.shuffle) NpContent else NpContent70,
+            shape = other(small),
             onClick = controller::toggleShuffle
         )
         NpRoundControl(
-            Icons.Rounded.FastRewind, "Previous", 52.dp,
-            container = NpContent.copy(alpha = 0.16f), tint = NpContent, onClick = controller::previous
+            Icons.Rounded.FastRewind, "Previous", medium,
+            container = NpContent.copy(alpha = 0.16f), tint = NpContent, shape = other(medium),
+            onClick = controller::previous
         )
         NpRoundControl(
             if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            if (state.isPlaying) "Pause" else "Play", 72.dp,
-            container = NpContent, tint = tint, onClick = controller::togglePlayPause
+            if (state.isPlaying) "Pause" else "Play", big,
+            container = NpContent, tint = tint, shape = playShape, onClick = controller::togglePlayPause
         )
         NpRoundControl(
-            Icons.Rounded.FastForward, "Next", 52.dp,
-            container = NpContent.copy(alpha = 0.16f), tint = NpContent,
+            Icons.Rounded.FastForward, "Next", medium,
+            container = NpContent.copy(alpha = 0.16f), tint = NpContent, shape = other(medium),
             enabled = state.hasNext, onClick = controller::next
         )
         NpRoundControl(
             if (state.repeat == RepeatMode.ONE) Icons.Filled.RepeatOne else Icons.Outlined.Repeat,
-            "Repeat: ${state.repeat.label}", 42.dp,
+            "Repeat: ${state.repeat.label}", small,
             container = NpContent.copy(alpha = if (state.repeat == RepeatMode.OFF) 0.10f else 0.30f),
             tint = if (state.repeat == RepeatMode.OFF) NpContent70 else NpContent,
+            shape = other(small),
             onClick = controller::cycleRepeat
         )
     }
@@ -529,12 +549,13 @@ private fun NpRoundControl(
     container: Color,
     tint: Color,
     onClick: () -> Unit,
+    shape: Shape = CircleShape,
     enabled: Boolean = true
 ) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(shape)
             .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick)
             .background(container),
         contentAlignment = Alignment.Center

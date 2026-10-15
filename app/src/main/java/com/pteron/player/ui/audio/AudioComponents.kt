@@ -59,6 +59,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.mutableStateOf
@@ -362,6 +363,8 @@ fun PillowSheen(shape: Shape, modifier: Modifier = Modifier.fillMaxSize()) {
 fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: Modifier = Modifier) {
     val state by controller.state.collectAsState()
     val song = state.current ?: return
+    // Back in the app after it was closed: re-read the player so the buttons are live again.
+    LaunchedEffect(Unit) { controller.resync() }
     val scheme = MaterialTheme.colorScheme
     val shape = RoundedCornerShape(24.dp)
     PteronClickableCard(
@@ -394,6 +397,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                     icon = Icons.Rounded.FastRewind,
                     description = "Previous",
                     size = 36.dp,
+                    shape = RoundedCornerShape(12.dp),
                     container = scheme.primary.copy(alpha = 0.16f),
                     tint = scheme.primary,
                     enabled = state.hasPrevious,
@@ -411,6 +415,7 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                     icon = Icons.Rounded.FastForward,
                     description = "Next",
                     size = 36.dp,
+                    shape = RoundedCornerShape(12.dp),
                     container = scheme.primary.copy(alpha = 0.16f),
                     tint = scheme.primary,
                     enabled = state.hasNext,
@@ -453,12 +458,13 @@ private fun MiniRoundButton(
     container: Color,
     tint: Color,
     onClick: () -> Unit,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    shape: Shape = CircleShape
 ) {
     Box(
         modifier = Modifier
             .size(size)
-            .clip(CircleShape)
+            .clip(shape)
             .background(container)
             .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick),
         contentAlignment = Alignment.Center

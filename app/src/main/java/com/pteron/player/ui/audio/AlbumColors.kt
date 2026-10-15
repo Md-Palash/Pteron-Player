@@ -15,6 +15,8 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.max
 import kotlin.math.min
 
@@ -27,16 +29,39 @@ fun deepTint(color: Color): Color {
     return Color(ColorUtils.HSLToColor(hsl))
 }
 
+/** Backgrounds already worked out, by cover Uri, so a screen can start in its final colour. */
+private val tintCache = ConcurrentHashMap<String, Color>()
+
+private fun cacheTint(uri: String, color: Color) {
+    if (tintCache.size > 300) tintCache.clear()
+    tintCache[uri] = color
+}
+
 /**
- * The background color for a song, taken from its cover art. While a new cover is still being read
- * the previous color stays, so the screen never flashes; [fallback] is used when there is no art.
+ * Works out (and caches) the background colour of a song's cover ahead of time, e.g. before the
+ * Now Playing screen opens. Gives up after [timeoutMs] so a slow cover never delays the app.
+ */
+suspend fun warmArtTint(context: Context, contentUri: String?, timeoutMs: Long = 300L) {
+    if (contentUri == null || tintCache.containsKey(contentUri)) return
+    withTimeoutOrNull(timeoutMs) {
+        withContext(Dispatchers.Default) { extractTint(context, contentUri) }
+    }?.let { cacheTint(contentUri, it) }
+}
+
+/**
+ * The background color for a song, taken from its cover art. A color that is already cached is
+ * used on the very first frame (no fade-in from another color); while a new cover is still being
+ * read the previous color stays, so the screen never flashes. [fallback] is used when there is no art.
  */
 @Composable
 fun rememberArtTint(contentUri: String?, fallback: Color): Color {
     val context = LocalContext.current
-    val tint = produceState(initialValue = fallback, contentUri, fallback) {
+    val tint = produceState(
+        initialValue = contentUri?.let { tintCache[it] } ?: fallback,
+        contentUri, fallback
+    ) {
         value = contentUri?.let { uri ->
-            withContext(Dispatchers.Default) { extractTint(context, uri) }
+            tintCache[uri] ?: withContext(Dispatchers.Default) { extractTint(context, uri) }?.also { cacheTint(uri, it) }
         } ?: fallback
     }
     return tint.value

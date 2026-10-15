@@ -42,7 +42,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
+import com.pteron.player.ui.common.FloatingPills
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -127,9 +130,14 @@ fun AudioScreen(
         TabReselect.events.collect { if (it == BottomNavDestination.AUDIO) tab = TAB_HOME }
     }
 
+    val scope = rememberCoroutineScope()
     fun play(songs: List<AudioItem>, index: Int, shuffle: Boolean = false) {
-        controller.playQueue(songs, index, shuffle)
-        if (prefs.openNowPlayingOnPlay) onOpenNowPlaying()
+        scope.launch {
+            // Read the cover's colour first, so the Now Playing screen opens already in its final colour.
+            if (prefs.openNowPlayingOnPlay) warmArtTint(context, songs.getOrNull(index)?.contentUri)
+            controller.playQueue(songs, index, shuffle)
+            if (prefs.openNowPlayingOnPlay) onOpenNowPlaying()
+        }
     }
 
     val bottomClearance = if (player.current != null) NavAndMiniClearance else NavClearance
@@ -187,13 +195,16 @@ fun AudioScreen(
                         onAction = viewModel::refresh
                     )
                     else -> {
-                        AudioTabRow(TabLabels, tab) { tab = it }
-                        Spacer(Modifier.height(12.dp))
+                        FloatingPills(
+                            modifier = Modifier.fillMaxSize(),
+                            pills = { AudioTabRow(TabLabels, tab) { tab = it } }
+                        ) { topPadding ->
                         Crossfade(targetState = tab, modifier = Modifier.fillMaxSize(), animationSpec = tween(200), label = "audioTabContent") { currentTab ->
                         when (currentTab) {
                             TAB_HOME -> AudioHome(
                                 state = state,
                                 bottomPadding = bottomClearance,
+                                topPadding = topPadding,
                                 onPlay = { songs, index -> play(songs, index) },
                                 onMenu = { menu.options = it },
                                 onOpenArtist = onOpenArtist,
@@ -204,6 +215,7 @@ fun AudioScreen(
                                 songs = state.songs,
                                 emptyText = "No songs found.",
                                 bottomPadding = bottomClearance,
+                                topPadding = topPadding,
                                 onPlay = { songs, index -> play(songs, index) },
                                 onMenu = { menu.options = it }
                             )
@@ -211,11 +223,13 @@ fun AudioScreen(
                                 songs = state.favorites,
                                 emptyText = "Songs you mark as favorite will show up here.",
                                 bottomPadding = bottomClearance,
+                                topPadding = topPadding,
                                 onPlay = { songs, index -> play(songs, index) },
                                 onMenu = { menu.options = it }
                             )
-                            TAB_PLAYLIST -> PlaylistGrid(state, bottomClearance, onOpenPlaylist)
-                            TAB_ARTIST -> ArtistGrid(state, bottomClearance, onOpenArtist)
+                            TAB_PLAYLIST -> PlaylistGrid(state, bottomClearance, topPadding, onOpenPlaylist)
+                            TAB_ARTIST -> ArtistGrid(state, bottomClearance, topPadding, onOpenArtist)
+                        }
                         }
                         }
                     }
@@ -251,6 +265,7 @@ fun AudioScreen(
 private fun AudioHome(
     state: AudioUiState,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    topPadding: androidx.compose.ui.unit.Dp,
     onPlay: (List<AudioItem>, Int) -> Unit,
     onMenu: (AudioItem) -> Unit,
     onOpenArtist: (String) -> Unit,
@@ -259,7 +274,7 @@ private fun AudioHome(
 ) {
     val byId = remember(state.songs) { state.songs.associateBy { it.id } }
     LazyColumn(
-        contentPadding = PaddingValues(top = 4.dp, bottom = bottomPadding),
+        contentPadding = PaddingValues(top = topPadding + 4.dp, bottom = bottomPadding),
         verticalArrangement = Arrangement.spacedBy(4.dp),
         modifier = Modifier.fillMaxSize()
     ) {
@@ -341,16 +356,17 @@ private fun SongGrid(
     songs: List<AudioItem>,
     emptyText: String,
     bottomPadding: androidx.compose.ui.unit.Dp,
+    topPadding: androidx.compose.ui.unit.Dp,
     onPlay: (List<AudioItem>, Int) -> Unit,
     onMenu: (AudioItem) -> Unit
 ) {
     if (songs.isEmpty()) {
-        EmptyHint(emptyText)
+        EmptyHint(emptyText, Modifier.padding(top = topPadding))
         return
     }
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = bottomPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
@@ -363,15 +379,15 @@ private fun SongGrid(
 }
 
 @Composable
-private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, onOpenPlaylist: (Long) -> Unit) {
+private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, topPadding: androidx.compose.ui.unit.Dp, onOpenPlaylist: (Long) -> Unit) {
     if (state.playlists.isEmpty()) {
-        EmptyHint("No playlists yet. Tap + to create one, then add songs from the \u22EE menu on any song.")
+        EmptyHint("No playlists yet. Tap + to create one, then add songs from the \u22EE menu on any song.", Modifier.padding(top = topPadding))
         return
     }
     val byId = remember(state.songs) { state.songs.associateBy { it.id } }
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = bottomPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
@@ -390,14 +406,14 @@ private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui
 }
 
 @Composable
-private fun ArtistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, onOpenArtist: (String) -> Unit) {
+private fun ArtistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, topPadding: androidx.compose.ui.unit.Dp, onOpenArtist: (String) -> Unit) {
     if (state.artists.isEmpty()) {
-        EmptyHint("No artists found.")
+        EmptyHint("No artists found.", Modifier.padding(top = topPadding))
         return
     }
     LazyVerticalGrid(
         columns = GridCells.Fixed(3),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = bottomPadding),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 4.dp, bottom = bottomPadding),
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
