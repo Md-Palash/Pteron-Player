@@ -273,10 +273,12 @@ fun PteronNavGraph(
 
         composable(
             route = Screen.NowPlaying.route,
-            enterTransition = { pushEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
-            popExitTransition = { popExit }
+            // The big card rises from the bottom (like opening the mini card) and drops back down;
+            // it is opaque the whole time, so no light window background shows through.
+            enterTransition = { slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it } },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { slideOutVertically(tween(320, easing = FastOutSlowInEasing)) { it } }
         ) {
             NowPlayingScreen(
                 controller = app.audioController,
