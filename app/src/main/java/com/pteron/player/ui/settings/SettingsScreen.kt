@@ -572,7 +572,7 @@ private fun FontSection(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("Font", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        "${font.displayName} \u2022 ${fontSizeLabel(scale)}",
+                        "${font.displayName} \u2022 ${(scale * 100).roundToInt()}%",
                         style = MaterialTheme.typography.bodySmall.copy(fontFamily = font.fontFamily()),
                         color = scheme.onSurfaceVariant,
                         maxLines = 1
@@ -629,7 +629,7 @@ private fun FontSection(
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text("Font size", style = MaterialTheme.typography.titleMedium)
                                     Text(
-                                        "${fontSizeLabel(scale)} (${(scale * 100).roundToInt()}%)",
+                                        "${(scale * 100).roundToInt()}%",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = scheme.onSurfaceVariant,
                                         maxLines = 1
@@ -657,10 +657,7 @@ private fun FontSection(
         FontSizeSheet(
             selected = scale,
             font = font,
-            onSelect = {
-                onSelectScale(it)
-                showSizeSheet = false
-            },
+            onSelect = { onSelectScale(it) },
             onDismiss = { showSizeSheet = false }
         )
     }
@@ -682,61 +679,52 @@ private fun FontBubble(font: AppFont) {
     }
 }
 
-/** Bottom sheet with a live preview line and one pill per size; each pill is drawn at its own size. */
+/** Bottom sheet with a live preview line and a slider from 80% to 140%; saved when the finger lifts. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FontSizeSheet(selected: Float, font: AppFont, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    var preview by remember { mutableFloatStateOf(selected) }
+    var preview by remember(selected) { mutableFloatStateOf(selected) }
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 4.dp)
                 .padding(bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(
-                "Font size",
-                style = MaterialTheme.typography.titleMedium,
-                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("Font size", style = MaterialTheme.typography.titleMedium)
+                Text("${(preview * 100).roundToInt()}%", style = MaterialTheme.typography.titleMedium, color = scheme.primary)
+            }
             SettingsCard {
                 Text(
                     "The quick brown fox jumps over the lazy dog.",
                     style = MaterialTheme.typography.bodyMedium.copy(
                         fontFamily = font.fontFamily(),
+                        // The sheet itself is already drawn at the saved size; this keeps the sample at the previewed one.
                         fontSize = (14f * preview / selected.coerceAtLeast(0.1f)).sp
                     ),
                     modifier = Modifier.padding(16.dp)
                 )
             }
-            fontSizeOptions.forEach { (value, label) ->
-                val isSelected = kotlin.math.abs(value - selected) < 0.01f
-                val content = if (isSelected) scheme.onPrimary else scheme.onSurface
-                PteronClickableCard(
-                    onClick = { onSelect(value) },
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(percent = 50),
-                    color = if (isSelected) scheme.primary else scheme.surfaceContainer,
-                    borderColor = if (isSelected) androidx.compose.ui.graphics.Color.Transparent
-                    else scheme.outlineVariant.copy(alpha = 0.5f)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            label,
-                            style = MaterialTheme.typography.titleSmall.copy(fontSize = (14f * value / selected.coerceAtLeast(0.1f)).sp),
-                            color = content,
-                            modifier = Modifier.weight(1f)
-                        )
-                        if (isSelected) {
-                            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(20.dp))
-                        }
-                    }
-                }
+            Slider(
+                value = preview,
+                onValueChange = { preview = it },
+                onValueChangeFinished = { onSelect(preview) },
+                valueRange = 0.8f..1.4f,
+                steps = 11
+            )
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                Text("80%", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                Text("140%", style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+            }
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = { onSelect(1f) }) { Text("Reset to 100%") }
             }
         }
     }
