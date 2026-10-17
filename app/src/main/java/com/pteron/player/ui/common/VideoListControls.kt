@@ -69,7 +69,8 @@ fun FloatingPills(
     content: @Composable (topPadding: Dp) -> Unit
 ) {
     val density = LocalDensity.current
-    var pillsHeight by remember { mutableStateOf(0.dp) }
+    // A close first estimate, so the list does not jump when the real height is measured.
+    var pillsHeight by remember { mutableStateOf(58.dp) }
     Box(modifier = modifier) {
         content(pillsHeight)
         Box(
@@ -113,17 +114,9 @@ private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
     val pill = RoundedCornerShape(percent = 50)
     PteronClickableCard(
         onClick = onClick,
-        // Lifted off the screen so the filters read as floating buttons, not a fixed header strip.
-        modifier = Modifier.shadow(
-            elevation = 6.dp,
-            shape = pill,
-            clip = false,
-            ambientColor = Color.Black.copy(alpha = 0.35f),
-            spotColor = Color.Black.copy(alpha = 0.45f)
-        ),
         shape = pill,
         color = container,
-        borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
+        borderColor = Color.Transparent
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp),
