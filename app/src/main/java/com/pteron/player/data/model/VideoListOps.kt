@@ -42,7 +42,7 @@ fun List<VideoItem>.filteredAndSorted(
         VideoFilter.FAVORITES -> list.filter { it.isFavorite }
     }
     val sorted = when (appearance.sortOption) {
-        SortOption.NAME -> list.sortedBy { it.displayName.lowercase() }
+        SortOption.NAME -> list.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayName })
         SortOption.DATE_ADDED -> list.sortedBy { it.dateAddedSeconds }
         SortOption.SIZE -> list.sortedBy { it.sizeBytes }
         SortOption.DURATION -> list.sortedBy { it.durationMs }
