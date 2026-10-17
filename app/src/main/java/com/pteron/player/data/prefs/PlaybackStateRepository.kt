@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 private val Context.playbackDataStore by preferencesDataStore(name = "playback_state")
@@ -64,7 +65,7 @@ class PlaybackStateRepository(private val context: Context) {
                 hasSubtitleTrack = subtitleFlag(prefs, id)
             )
         }
-    }
+    }.distinctUntilChanged()
 
     private fun subtitleFlag(prefs: androidx.datastore.preferences.core.Preferences, id: Long): Boolean? = when {
         prefs[subtitledSetKey()]?.contains(id.toString()) == true -> true
