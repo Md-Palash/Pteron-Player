@@ -123,9 +123,9 @@ fun FolderScreen(
  pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
  ) { topPadding ->
 when {
-                uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = {})
+                uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
                 uiState.isLoading && uiState.videos.isEmpty() -> LoadingState()
-                uiState.videos.isEmpty() -> EmptyLibraryState(onRefresh = {})
+                uiState.videos.isEmpty() -> EmptyLibraryState(onRefresh = viewModel::refresh)
                 visibleVideos.isEmpty() -> NoSearchResultsState()
                 else -> when (uiState.appearance.viewMode) {
                     ViewMode.GRID -> LazyVerticalGrid(

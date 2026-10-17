@@ -16,6 +16,9 @@ import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.PlaybackStateRepository
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -74,12 +77,25 @@ class FolderViewModel(
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), FolderUiState(folderName = folderName))
 
+    private var loadJob: Job? = null
+
     init {
-        load()
+        refresh()
+        observeMediaChanges()
     }
 
-    private fun load() {
+    @OptIn(FlowPreview::class)
+    private fun observeMediaChanges() {
         viewModelScope.launch {
+            // A media scan can fire dozens of notifications in a burst; reload once it settles.
+            mediaStoreRepository.observeMediaChanges().debounce(500).collect { refresh() }
+        }
+    }
+
+    fun refresh() {
+        // A newer refresh replaces one still running.
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch {
             controls.update { it.copy(isLoading = true, errorMessage = null) }
             try {
                 // Only this folder's rows, not the whole device library (see MediaStoreRepository).
