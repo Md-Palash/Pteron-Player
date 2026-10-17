@@ -64,7 +64,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
@@ -354,32 +356,38 @@ private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side:
             modifier = Modifier.size(side - RingInset * 2).clip(FlowerShape),
             iconSize = 64.dp
         )
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            // Exactly the cover's flower, pushed outwards by RingGap.
-            val coverHalf = size.minDimension / 2f - RingInset.toPx()
-            val base = coverHalf * CoverBase
-            val amp = coverHalf * CoverAmp
-            val gap = RingGap.toPx()
-            val cx = size.width / 2f
-            val cy = size.height / 2f
-            val start = -PI.toFloat() / 2f
-            val full = 2f * PI.toFloat()
-
-            drawPath(
-                flowerPath(cx, cy, base, amp, gap, start, full, 240),
-                color = content.copy(alpha = 0.28f),
-                style = Stroke(width = 1.5.dp.toPx())
-            )
-            val p = progress.value
-            if (p > 0.002f) {
-                drawPath(
-                    flowerPath(cx, cy, base, amp, gap, start, full * p, max(8, (p * 240).toInt())),
-                    color = content,
-                    style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        Box(
+            modifier = Modifier.fillMaxSize().drawWithCache {
+                // Built once per size (not on every animation frame): the outline of the cover's
+                // flower pushed outwards by RingGap. The progress line is a piece of that outline.
+                val coverHalf = size.minDimension / 2f - RingInset.toPx()
+                val base = coverHalf * CoverBase
+                val amp = coverHalf * CoverAmp
+                val gap = RingGap.toPx()
+                val ring = flowerPath(
+                    size.width / 2f, size.height / 2f, base, amp, gap,
+                    -PI.toFloat() / 2f, 2f * PI.toFloat(), 240
                 )
+                val measure = PathMeasure().apply { setPath(ring, false) }
+                val length = measure.length
+                val piece = Path()
+                val faint = content.copy(alpha = 0.28f)
+                onDrawBehind {
+                    drawPath(ring, color = faint, style = Stroke(width = 1.5.dp.toPx()))
+                    val p = progress.value
+                    if (p > 0.002f) {
+                        piece.reset()
+                        measure.getSegment(0f, length * p, piece, true)
+                        drawPath(
+                            piece,
+                            color = content,
+                            style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                        )
+                    }
+                    drawCircle(content, radius = 6.dp.toPx(), center = measure.getPosition(length * p))
+                }
             }
-            drawCircle(content, radius = 6.dp.toPx(), center = flowerPoint(cx, cy, base, amp, gap, start + full * p))
-        }
+        )
     }
 }
 

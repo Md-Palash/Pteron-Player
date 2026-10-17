@@ -304,11 +304,9 @@ private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
     val pill = RoundedCornerShape(percent = 50)
     PteronClickableCard(
         onClick = onClick,
-        // Lifted off the screen so the tabs read as floating buttons, not a fixed header strip.
-        modifier = Modifier.pillowLift(pill, 6.dp),
         shape = pill,
         color = container,
-        borderColor = if (selected) Color.Transparent else scheme.outlineVariant.copy(alpha = 0.5f)
+        borderColor = Color.Transparent
     ) {
         Text(
             label,
