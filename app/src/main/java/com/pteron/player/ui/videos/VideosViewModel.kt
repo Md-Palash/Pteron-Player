@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -42,6 +43,8 @@ data class VideosUiState(
     val appearance: AppearanceState = AppearanceState(),
     val visibleVideos: List<VideoItem> = emptyList()
 )
+
+private const val OPEN_ANIMATION_MS = 320L
 
 /** Backs the "Videos" bottom-nav tab: every video in the library, regardless of folder. */
 class VideosViewModel(
@@ -92,7 +95,12 @@ class VideosViewModel(
     }
 
     init {
-        refresh()
+        // Let the tab-switch animation finish before the first MediaStore read and the first big
+        // list composition, so neither lands in the middle of the motion.
+        viewModelScope.launch {
+            delay(OPEN_ANIMATION_MS)
+            refresh()
+        }
         observeMediaChanges()
     }
 
