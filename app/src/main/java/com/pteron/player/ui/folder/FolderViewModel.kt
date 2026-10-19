@@ -18,6 +18,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +40,8 @@ data class FolderUiState(
     val appearance: AppearanceState = AppearanceState(),
     val visibleVideos: List<VideoItem> = emptyList()
 )
+
+private const val OPEN_ANIMATION_MS = 320L
 
 class FolderViewModel(
     private val bucketId: String,
@@ -80,7 +83,12 @@ class FolderViewModel(
     private var loadJob: Job? = null
 
     init {
-        refresh()
+        // Let the page-open animation finish before the first MediaStore read and the first big
+        // list composition, so neither lands in the middle of the motion.
+        viewModelScope.launch {
+            delay(OPEN_ANIMATION_MS)
+            refresh()
+        }
         observeMediaChanges()
     }
 
