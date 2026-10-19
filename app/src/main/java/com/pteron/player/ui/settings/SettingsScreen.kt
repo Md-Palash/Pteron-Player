@@ -14,6 +14,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.scaleIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
@@ -131,15 +132,29 @@ private const val ThemesPerRow = 4
 private val lightThemes = AppTheme.entries.filter { !it.isDark }
 private val darkThemes = AppTheme.entries.filter { it.isDark }
 
-/** Slide-and-fade between the header list and a section: forward when opening, reversed on back. */
+/**
+ * Slide, fade and a small settle between the header list and a section: forward when opening,
+ * reversed on back. No size animation: the layer has a fixed size, and animating (and clipping) it
+ * only added a jittery frame at the start.
+ */
 private fun settingsTransition(opening: Boolean): ContentTransform {
     val slide = tween<IntOffset>(durationMillis = 320, easing = FastOutSlowInEasing)
     return if (opening) {
-        (slideInHorizontally(slide) { it / 4 } + fadeIn(tween(260))) togetherWith
-            (slideOutHorizontally(slide) { -it / 6 } + fadeOut(tween(160)))
+        ContentTransform(
+            targetContentEnter = slideInHorizontally(slide) { it / 5 } +
+                fadeIn(tween(260, delayMillis = 40)) +
+                scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = 0.97f),
+            initialContentExit = slideOutHorizontally(slide) { -it / 8 } + fadeOut(tween(140)),
+            sizeTransform = null
+        )
     } else {
-        (slideInHorizontally(slide) { -it / 6 } + fadeIn(tween(260))) togetherWith
-            (slideOutHorizontally(slide) { it / 4 } + fadeOut(tween(160)))
+        ContentTransform(
+            targetContentEnter = slideInHorizontally(slide) { -it / 8 } +
+                fadeIn(tween(260, delayMillis = 40)) +
+                scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = 0.98f),
+            initialContentExit = slideOutHorizontally(slide) { it / 5 } + fadeOut(tween(140)),
+            sizeTransform = null
+        )
     }
 }
 
@@ -186,7 +201,7 @@ fun SettingsScreen(viewModel: SettingsViewModel) {
                         }
                         AnimatedContent(
                             targetState = openSection,
-                            transitionSpec = { fadeIn(tween(220, delayMillis = 60)) togetherWith fadeOut(tween(120)) },
+                            transitionSpec = { ContentTransform(fadeIn(tween(220, delayMillis = 60)), fadeOut(tween(120)), sizeTransform = null) },
                             label = "settingsTitle"
                         ) { section ->
                             TwoLineTitle(
@@ -235,7 +250,7 @@ private fun SettingsHome(onOpen: (SettingsSection) -> Unit) {
     SettingsPage {
         // One set holding every section card. When the list grows, split it into several sets.
         val sections = SettingsSection.entries
-        SettingsSet(count = sections.size) { index, shape ->
+        SettingsSet(count = sections.size, animateIn = true) { index, shape ->
             val section = sections[index]
             SettingsSetRow(
                 icon = section.icon,
