@@ -1,5 +1,8 @@
 package com.pteron.player.ui.common
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,11 +20,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.role
@@ -56,14 +62,37 @@ fun setItemShape(index: Int, count: Int): Shape = when {
 fun SettingsSet(
     count: Int,
     modifier: Modifier = Modifier,
+    /** Cards rise and fade in one after another when the set first appears. */
+    animateIn: Boolean = false,
     item: @Composable (index: Int, shape: Shape) -> Unit
 ) {
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(SetGap)
     ) {
-        repeat(count) { index -> item(index, setItemShape(index, count)) }
+        repeat(count) { index ->
+            if (animateIn) {
+                StaggerIn(index) { item(index, setItemShape(index, count)) }
+            } else {
+                item(index, setItemShape(index, count))
+            }
+        }
     }
+}
+
+/** Fades and lifts [content] in, [index] steps after the first card. Only the draw phase animates. */
+@Composable
+private fun StaggerIn(index: Int, content: @Composable () -> Unit) {
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) {
+        progress.animateTo(1f, tween(durationMillis = 320, delayMillis = 35 * index, easing = FastOutSlowInEasing))
+    }
+    Box(
+        modifier = Modifier.graphicsLayer {
+            alpha = progress.value
+            translationY = (1f - progress.value) * 18.dp.toPx()
+        }
+    ) { content() }
 }
 
 /** A card of a set in the theme's card shade (or [color]); tappable when [onClick] is given. */
