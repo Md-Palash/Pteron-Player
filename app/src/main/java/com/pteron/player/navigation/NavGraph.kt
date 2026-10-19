@@ -28,6 +28,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
@@ -88,10 +89,8 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
  * these are short and the incoming screen waits a beat so the two never muddy each other.
  */
-// The incoming tab fades up from slightly smaller while the outgoing one fades quickly underneath,
-// so there is never an empty frame between the two (the old 50 ms delay showed the bare window).
-private val tabFadeScaleEnter = fadeIn(tween(240, easing = FastOutSlowInEasing)) +
-    scaleIn(tween(240, easing = FastOutSlowInEasing), initialScale = 0.97f)
+private const val NavMs = 320
+private val navEase = FastOutSlowInEasing
 
 private fun tabIndex(route: String?): Int = BottomNavDestination.entries.indexOfFirst { it.screen.route == route }
 
@@ -102,39 +101,49 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabDirection(): In
     return if (from < 0 || to < 0 || from == to) 0 else sign((to - from).toFloat()).toInt()
 }
 
-// Moving between tabs: the new tab slides in from the side of its icon while fading up, and the old
-// one drifts the other way while fading out, so the bar and the content read as one gesture.
-// Non-tab neighbours (coming back from a folder or the player) keep the plain fade + scale.
+// Moving between tabs: the new tab slides in from the side of its icon while fading up and settling
+// from slightly smaller; the old one only drifts the other way and stays opaque until it is covered,
+// so two fading screens never dim the window between them (that read as a flicker).
+// Non-tab neighbours: a tab drifts in from the left when a pushed page closes, and drifts away to the
+// left when a page opens over it (parallax). The Now Playing card rises vertically, so tabs stay put.
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): EnterTransition {
     val dir = tabDirection()
-    if (dir == 0) return tabFadeScaleEnter
-    return slideInHorizontally(tween(340, easing = FastOutSlowInEasing)) { dir * it / 6 } +
-        fadeIn(tween(260, easing = FastOutSlowInEasing))
+    if (dir == 0) {
+        if (initialState.destination.route == Screen.NowPlaying.route) return EnterTransition.None
+        return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
+    }
+    return slideInHorizontally(tween(NavMs, easing = navEase)) { dir * it / 5 } +
+        fadeIn(tween(240, easing = navEase)) +
+        scaleIn(tween(NavMs, easing = navEase), initialScale = 0.97f)
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): ExitTransition {
     val dir = tabDirection()
-    // No fade for non-tab neighbours: the outgoing screen stays opaque until the new one covers it.
-    if (dir == 0) return ExitTransition.None
-    return slideOutHorizontally(tween(340, easing = FastOutSlowInEasing)) { -dir * it / 8 } +
-        fadeOut(tween(200, easing = FastOutSlowInEasing))
+    if (dir == 0) {
+        if (targetState.destination.route == Screen.NowPlaying.route) return ExitTransition.None
+        return slideOutHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
+    }
+    return slideOutHorizontally(tween(NavMs, easing = navEase)) { -dir * it / 8 }
 }
 
-// The video surface cannot slide or fade with the rest of the screen, so a slide-out looked stuck.
-// Leaving the player is a short plain fade instead.
+// The video surface cannot slide, scale or fade with the rest of the screen, so the player only
+// fades in and out (short) instead of moving.
+private val playerEnter = fadeIn(tween(220, easing = navEase))
 private val playerPopExit = fadeOut(tween(120))
 
-private val pushEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 5 } +
-    fadeIn(tween(240, easing = FastOutSlowInEasing))
-private val pushExit = ExitTransition.None
+// Pushed pages (Folder, playlists, artist): the page slides in from the right while fading up and
+// settling from slightly smaller; the page underneath drifts left a little (parallax).
+private val pushEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
+    fadeIn(tween(240, easing = navEase)) +
+    scaleIn(tween(NavMs, easing = navEase), initialScale = 0.96f)
+private val pushExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 
-// Going back mirrors going forward: the screen being left slides out to the right while it fades,
-// and the screen underneath drifts in from the left (a short parallax) as it fades up, instead of
-// popping in with a bare fade. Same easing on both so the two motions read as one gesture.
-private val popEnter = slideInHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { -it / 10 } +
-    fadeIn(tween(240, easing = FastOutSlowInEasing))
-private val popExit = slideOutHorizontally(animationSpec = tween(300, easing = FastOutSlowInEasing)) { it / 4 } +
-    fadeOut(tween(220, easing = FastOutSlowInEasing))
+// Going back mirrors going forward: the page being left slides out to the right while it fades and
+// shrinks a little, and the page underneath drifts back in from the left.
+private val popEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
+private val popExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
+    fadeOut(tween(200, easing = navEase)) +
+    scaleOut(tween(NavMs, easing = navEase), targetScale = 0.96f)
 
 @UnstableApi
 @Composable
@@ -376,7 +385,7 @@ fun PteronNavGraph(
                     defaultValue = -1L
                 }
             ),
-            enterTransition = { pushEnter },
+            enterTransition = { playerEnter },
             exitTransition = { pushExit },
             popEnterTransition = { popEnter },
             popExitTransition = { playerPopExit }
@@ -398,7 +407,7 @@ fun PteronNavGraph(
         composable(
             route = Screen.ExternalPlayer.route,
             arguments = listOf(navArgument("uri") { type = NavType.StringType }),
-            enterTransition = { pushEnter },
+            enterTransition = { playerEnter },
             exitTransition = { pushExit },
             popEnterTransition = { popEnter },
             popExitTransition = { playerPopExit }
