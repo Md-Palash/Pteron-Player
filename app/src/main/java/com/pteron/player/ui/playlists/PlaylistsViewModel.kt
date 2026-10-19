@@ -10,6 +10,7 @@ import com.pteron.player.data.model.hydrate
 import com.pteron.player.data.prefs.PlaybackStateRepository
 import com.pteron.player.data.prefs.PlaylistRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -71,6 +72,8 @@ class PlaylistDetailViewModel(
 
     init {
         viewModelScope.launch {
+            // Let the page-open animation finish before the first MediaStore read.
+            delay(320L)
             repository.observe(playlistId).collectLatest { playlist ->
                 if (playlist == null) {
                     _uiState.value = _uiState.value.copy(isLoading = false, notFound = true)
