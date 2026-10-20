@@ -1,5 +1,25 @@
 package com.pteron.player.ui.common
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.layout.boundsInParent
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
+import kotlinx.coroutines.launch
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
@@ -86,56 +106,129 @@ fun FloatingPills(
 
 @Composable
 fun FilterCardsRow(active: VideoFilter, onSelect: (VideoFilter) -> Unit, modifier: Modifier = Modifier) {
-    LazyRow(
-        modifier = modifier,
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    val filters = VideoFilter.entries
+    val labels = remember { filters.map { it.label } }
+    SlidingPillRow(
+        labels = labels,
+        selectedIndex = filters.indexOf(active),
+        onSelect = { onSelect(filters[it]) },
+        modifier = modifier
+    )
+}
+
+/**
+ * A row of pill buttons with one accent pill that glides (with a tiny spring overshoot) from the
+ * old selection to the new one, instead of the colour simply swapping. The pills' backgrounds and
+ * the gliding pill are painted in one draw pass behind the labels, so nothing is recomposed while
+ * it moves. Scrolls sideways if the pills do not fit, and keeps the selected one in view.
+ */
+@Composable
+fun SlidingPillRow(
+    labels: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val scheme = MaterialTheme.colorScheme
+    val card = scheme.surfaceContainer
+    val accent = scheme.primary
+    val density = LocalDensity.current
+    val scroll = rememberScrollState()
+    val bounds = remember(labels.size) {
+        mutableStateListOf<Rect?>().apply { repeat(labels.size) { add(null) } }
+    }
+    val indicatorX = remember { Animatable(0f) }
+    val indicatorW = remember { Animatable(0f) }
+    var placed by remember { mutableStateOf(false) }
+    var viewport by remember { mutableIntStateOf(0) }
+    val startPad = with(density) { 16.dp.toPx() }
+    val target = bounds.getOrNull(selectedIndex)
+
+    LaunchedEffect(target) {
+        val t = target ?: return@LaunchedEffect
+        if (!placed) {
+            // First measurement: appear in place instead of gliding in from the left edge.
+            indicatorX.snapTo(t.left)
+            indicatorW.snapTo(t.width)
+            placed = true
+        } else {
+            val glide = spring<Float>(dampingRatio = 0.75f, stiffness = Spring.StiffnessMediumLow)
+            launch { indicatorX.animateTo(t.left, glide) }
+            launch { indicatorW.animateTo(t.width, glide) }
+        }
+    }
+    LaunchedEffect(target, viewport) {
+        val t = target ?: return@LaunchedEffect
+        if (viewport == 0) return@LaunchedEffect
+        val left = t.left + startPad
+        val right = t.right + startPad
+        if (left < scroll.value || right > scroll.value + viewport) {
+            scroll.animateScrollTo(((left + right) / 2f - viewport / 2f).toInt().coerceIn(0, scroll.maxValue))
+        }
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .onSizeChanged { viewport = it.width }
+            .horizontalScroll(scroll)
     ) {
-        items(VideoFilter.entries, key = { it.name }) { filter ->
-            FilterCard(label = filter.label, selected = active == filter, onClick = { onSelect(filter) })
+        Box(
+            modifier = Modifier
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .drawBehind {
+                    bounds.forEach { b ->
+                        if (b != null) {
+                            drawRoundRect(
+                                card,
+                                topLeft = Offset(b.left, b.top),
+                                size = Size(b.width, b.height),
+                                cornerRadius = CornerRadius(b.height / 2f)
+                            )
+                        }
+                    }
+                    val ref = bounds.getOrNull(selectedIndex) ?: bounds.firstOrNull { it != null }
+                    if (placed && ref != null) {
+                        drawRoundRect(
+                            accent,
+                            topLeft = Offset(indicatorX.value, ref.top),
+                            size = Size(indicatorW.value, ref.height),
+                            cornerRadius = CornerRadius(ref.height / 2f)
+                        )
+                    }
+                }
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                labels.forEachIndexed { index, label ->
+                    PillLabel(
+                        label = label,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                        onBounds = { r -> if (bounds.getOrNull(index) != r && index < bounds.size) bounds[index] = r }
+                    )
+                }
+            }
         }
     }
 }
 
-/** A narrow pill (tablet) card: medium shade normally, dark (accent) shade when selected. */
 @Composable
-private fun FilterCard(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun PillLabel(label: String, selected: Boolean, onClick: () -> Unit, onBounds: (Rect) -> Unit) {
     val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(
-        targetValue = if (selected) scheme.primary else scheme.surfaceContainer,
-        animationSpec = tween(180),
-        label = "filterCardColor"
-    )
-    val content by animateColorAsState(
+    val color by animateColorAsState(
         targetValue = if (selected) scheme.onPrimary else scheme.onSurface,
-        animationSpec = tween(180),
-        label = "filterCardContent"
+        animationSpec = tween(200),
+        label = "pillText"
     )
-    val pill = RoundedCornerShape(percent = 50)
-    PteronClickableCard(
-        onClick = onClick,
-        shape = pill,
-        color = container,
-        borderColor = Color.Transparent
+    Box(
+        modifier = Modifier
+            .onGloballyPositioned { onBounds(it.boundsInParent()) }
+            .clip(RoundedCornerShape(percent = 50))
+            .semantics { role = Role.Tab }
+            .bouncyClickable(onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 11.dp)
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AnimatedVisibility(
-                visible = selected,
-                enter = fadeIn(tween(150)) + expandHorizontally(tween(150)),
-                exit = fadeOut(tween(120)) + shrinkHorizontally(tween(120))
-            ) {
-                Icon(
-                    Icons.Filled.Check,
-                    contentDescription = null,
-                    tint = content,
-                    modifier = Modifier.padding(end = 4.dp).size(14.dp)
-                )
-            }
-            Text(label, style = MaterialTheme.typography.titleSmall, color = content)
-        }
+        Text(label, style = MaterialTheme.typography.titleSmall, color = color)
     }
 }
 
