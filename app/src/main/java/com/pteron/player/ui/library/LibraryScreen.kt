@@ -1,5 +1,8 @@
 package com.pteron.player.ui.library
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -65,7 +68,9 @@ private val BottomNavClearance = 108.dp
 fun LibraryScreen(
     viewModel: LibraryViewModel,
     onOpenFolder: (bucketId: String, name: String) -> Unit,
-    onOpenVideo: (videoId: Long, bucketId: String) -> Unit
+    onOpenVideo: (videoId: Long, bucketId: String) -> Unit,
+    /** False while the screen is still sliding in: the big list waits for it. */
+    settled: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val context = LocalContext.current
@@ -141,7 +146,8 @@ fun LibraryScreen(
                         viewMode = effectiveViewMode,
                         onSearchQueryChange = viewModel::onSearchQueryChange,
                         onOpenFolder = onOpenFolder,
-                        onOpenVideo = onOpenVideo
+                        onOpenVideo = onOpenVideo,
+                        settled = settled
                     )
                 }
             }
@@ -155,7 +161,8 @@ private fun LibraryContent(
     viewMode: ViewMode,
     onSearchQueryChange: (String) -> Unit,
     onOpenFolder: (String, String) -> Unit,
-    onOpenVideo: (Long, String) -> Unit
+    onOpenVideo: (Long, String) -> Unit,
+    settled: Boolean
 ) {
     val filtered = uiState.filteredFolders
 
@@ -169,6 +176,8 @@ private fun LibraryContent(
             )
         }
 
+        AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
         if (uiState.searchQuery.isNotBlank() && filtered.isEmpty()) {
             NoSearchResultsState()
             return@Column
@@ -223,6 +232,8 @@ private fun LibraryContent(
                     )
                 }
             }
+        }
+        }
         }
     }
 }
