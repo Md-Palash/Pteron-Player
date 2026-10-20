@@ -1,5 +1,6 @@
 package com.pteron.player.navigation
 
+import com.pteron.player.util.rememberSettled
 import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
@@ -218,6 +219,7 @@ fun PteronNavGraph(
             )
             LibraryScreen(
                 viewModel = viewModel,
+                settled = rememberSettled(),
                 onOpenFolder = { bucketId, name -> navController.navigate(Screen.Folder.createRoute(bucketId, name)) },
                 onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) }
             )
@@ -231,6 +233,7 @@ fun PteronNavGraph(
             )
             VideosScreen(
                 viewModel = viewModel,
+                settled = rememberSettled(),
                 onOpenVideo = { videoId, bucketId -> navController.navigate(Screen.Player.createRoute(videoId, bucketId)) }
             )
         }
@@ -238,6 +241,7 @@ fun PteronNavGraph(
         composable(Screen.Audio.route) {
             AudioScreen(
                 viewModel = audioViewModel,
+                settled = rememberSettled(),
                 controller = app.audioController,
                 onOpenArtist = { navController.navigate(Screen.AudioArtist.createRoute(it)) },
                 onOpenPlaylist = { navController.navigate(Screen.AudioPlaylist.createRoute(it)) },
@@ -363,6 +367,7 @@ fun PteronNavGraph(
             )
             FolderScreen(
                 viewModel = viewModel,
+                settled = rememberSettled(),
                 onBack = navController::popBackStack,
                 onOpenVideo = { videoId, folderBucketId -> navController.navigate(Screen.Player.createRoute(videoId, folderBucketId)) },
                 onShufflePlay = { videoId, folderBucketId ->
