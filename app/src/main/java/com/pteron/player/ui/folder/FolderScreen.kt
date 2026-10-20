@@ -1,5 +1,8 @@
 package com.pteron.player.ui.folder
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -55,7 +58,9 @@ fun FolderScreen(
     viewModel: FolderViewModel,
     onBack: () -> Unit,
     onOpenVideo: (videoId: Long, bucketId: String) -> Unit,
-    onShufflePlay: (firstVideoId: Long, bucketId: String) -> Unit
+    onShufflePlay: (firstVideoId: Long, bucketId: String) -> Unit,
+    /** False while the screen is still sliding in: the big list waits for it. */
+    settled: Boolean = true
 ) {
     val uiState by viewModel.uiState.collectAsState()
     // `visibleVideos` filters and sorts the whole list on every read, so compute it once per state.
@@ -122,6 +127,7 @@ fun FolderScreen(
  modifier = Modifier.fillMaxSize(),
  pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
  ) { topPadding ->
+AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
 when {
                 uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
                 uiState.isLoading && uiState.videos.isEmpty() -> LoadingState()
@@ -165,7 +171,9 @@ when {
                     }
                 }
             }
- }
+ 
+}
+}
         }
     }
 }
