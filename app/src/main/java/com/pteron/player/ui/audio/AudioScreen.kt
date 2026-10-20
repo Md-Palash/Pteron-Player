@@ -1,5 +1,7 @@
 package com.pteron.player.ui.audio
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
@@ -86,7 +88,9 @@ fun AudioScreen(
     controller: AudioPlayerController,
     onOpenArtist: (String) -> Unit,
     onOpenPlaylist: (Long) -> Unit,
-    onOpenNowPlaying: () -> Unit
+    onOpenNowPlaying: () -> Unit,
+    /** False while the screen is still sliding in: the big list waits for it. */
+    settled: Boolean = true
 ) {
     val state by viewModel.uiState.collectAsState()
     val prefs by viewModel.musicPrefs.collectAsState()
@@ -199,6 +203,7 @@ fun AudioScreen(
                             modifier = Modifier.fillMaxSize(),
                             pills = { AudioTabRow(TabLabels, tab) { tab = it } }
                         ) { topPadding ->
+AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
                         Crossfade(targetState = tab, modifier = Modifier.fillMaxSize(), animationSpec = tween(200), label = "audioTabContent") { currentTab ->
                         when (currentTab) {
                             TAB_HOME -> AudioHome(
@@ -231,7 +236,9 @@ fun AudioScreen(
                             TAB_ARTIST -> ArtistGrid(state, bottomClearance, topPadding, onOpenArtist)
                         }
                         }
-                        }
+                        
+}
+}
                     }
                 }
             }

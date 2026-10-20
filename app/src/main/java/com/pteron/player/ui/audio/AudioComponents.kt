@@ -1,5 +1,6 @@
 package com.pteron.player.ui.audio
 
+import com.pteron.player.ui.common.SlidingPillRow
 import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.animateColorAsState
@@ -285,36 +286,10 @@ fun SongCardRow(
     }
 }
 
-/** The tabloid (pill) buttons at the top of the Audio section. */
+/** The pill buttons at the top of the Audio section; the accent pill glides between them. */
 @Composable
 fun AudioTabRow(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    LazyRow(
-        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        itemsIndexed(labels) { index, label -> AudioTab(label, index == selected) { onSelect(index) } }
-    }
-}
-
-@Composable
-private fun AudioTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val container by animateColorAsState(if (selected) scheme.primary else scheme.surfaceContainer, tween(180), label = "audioTabColor")
-    val content by animateColorAsState(if (selected) scheme.onPrimary else scheme.onSurface, tween(180), label = "audioTabContent")
-    val pill = RoundedCornerShape(percent = 50)
-    PteronClickableCard(
-        onClick = onClick,
-        shape = pill,
-        color = container,
-        borderColor = Color.Transparent
-    ) {
-        Text(
-            label,
-            style = MaterialTheme.typography.titleSmall,
-            color = content,
-            modifier = Modifier.padding(horizontal = 22.dp, vertical = 11.dp)
-        )
-    }
+    SlidingPillRow(labels = labels, selectedIndex = selected, onSelect = onSelect)
 }
 
 // --- Mini player ------------------------------------------------------------------------------
