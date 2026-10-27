@@ -43,9 +43,6 @@ enum class AppTheme(
     AUBERGINE("Aubergine", true, "#130F17", "#1F1727", "#B58CE8"),
     LAGOON("Lagoon", true, "#0E1515", "#152325", "#4FC3BE");
 
-    /** Background as an ARGB int, for the window background (drawn before Compose is ready). */
-    val backgroundArgb: Int get() = android.graphics.Color.parseColor(backgroundHex)
-
     companion object {
         val DEFAULT = TERRACOTTA
 
