@@ -12,10 +12,7 @@ data class AudioItem(
     val sizeBytes: Long,
     val dateAddedSeconds: Long,
     val isFavorite: Boolean = false
-) {
-    /** The system's album-art Uri; used as the artwork of the media notification / lock screen. */
-    val albumArtUri: String get() = "content://media/external/audio/albumart/$albumId"
-}
+)
 
 /** An artist and the songs that belong to it; [coverContentUri] is the first song, used for its art. */
 data class AudioArtist(
