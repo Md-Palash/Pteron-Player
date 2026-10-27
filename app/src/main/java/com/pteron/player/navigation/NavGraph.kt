@@ -127,6 +127,29 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): Exit
     return slideOutHorizontally(tween(NavMs, easing = navEase)) { -dir * it / 8 }
 }
 
+// Going to a tab that is already in the back stack (always the Library, the start destination) is a
+// "pop", not a push: Navigation draws the screen being left ON TOP of the one coming back. That
+// screen used to drift only an eighth of the way and stay opaque, so the Library animated in
+// underneath it, invisibly, and then the old screen vanished at the very end -- the screen
+// looked stuck and then jumped. Now the screen being left really leaves (slides away, fades and
+// shrinks a little) and reveals the Library underneath.
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopEnterFor(): EnterTransition {
+    val dir = tabDirection()
+    if (dir == 0) {
+        if (initialState.destination.route == Screen.NowPlaying.route) return EnterTransition.None
+        return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
+    }
+    return slideInHorizontally(tween(NavMs, easing = navEase)) { dir * it / 8 }
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopExitFor(): ExitTransition {
+    val dir = tabDirection()
+    if (dir == 0) return fadeOut(tween(160, easing = navEase))
+    return slideOutHorizontally(tween(NavMs, easing = navEase)) { -dir * it / 3 } +
+        fadeOut(tween(NavMs - 60, easing = navEase)) +
+        scaleOut(tween(NavMs, easing = navEase), targetScale = 0.97f)
+}
+
 // The video surface cannot slide, scale or fade with the rest of the screen, so the player only
 // fades in and out (short) instead of moving.
 private val playerEnter = fadeIn(tween(220, easing = navEase))
@@ -208,8 +231,8 @@ fun PteronNavGraph(
         startDestination = Screen.Library.route,
         enterTransition = { tabEnterFor() },
         exitTransition = { tabExitFor() },
-        popEnterTransition = { tabEnterFor() },
-        popExitTransition = { tabExitFor() }
+        popEnterTransition = { tabPopEnterFor() },
+        popExitTransition = { tabPopExitFor() }
     ) {
         composable(Screen.Library.route) {
             val viewModel: LibraryViewModel = viewModel(
