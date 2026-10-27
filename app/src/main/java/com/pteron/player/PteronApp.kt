@@ -55,6 +55,8 @@ class PteronApp : Application(), ImageLoaderFactory {
                 add(VideoThumbnailFetcher.Factory(this@PteronApp))
                 add(AudioThumbnailFetcher.Factory(this@PteronApp))
             }
+            // Thumbnails come from MediaStore, which keeps its own cache: no second copy on disk.
+            .diskCache(null)
             .memoryCache {
                 MemoryCache.Builder(this)
                     .maxSizePercent(0.12)
