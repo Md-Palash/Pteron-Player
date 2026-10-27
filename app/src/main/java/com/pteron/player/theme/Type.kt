@@ -61,7 +61,7 @@ private val defaultType = Typography()
  *  - labelLarge / labelMedium chips, buttons, counts
  *  - labelSmall     tiny badges and the small-caps line above a screen title
  */
-fun pteronTypography(font: AppFont, scale: Float = 1f): Typography {
+fun pteronTypography(font: AppFont): Typography {
     val family = font.fontFamily()
     fun TextStyle.styled(
         weight: FontWeight? = null,
@@ -75,7 +75,7 @@ fun pteronTypography(font: AppFont, scale: Float = 1f): Typography {
         lineHeight = lineHeight?.sp ?: this.lineHeight,
         letterSpacing = letterSpacing?.sp ?: this.letterSpacing
     )
-    val base = Typography(
+    return Typography(
         displayLarge = defaultType.displayLarge.styled(),
         displayMedium = defaultType.displayMedium.styled(),
         displaySmall = defaultType.displaySmall.styled(),
@@ -91,24 +91,5 @@ fun pteronTypography(font: AppFont, scale: Float = 1f): Typography {
         labelLarge = defaultType.labelLarge.styled(FontWeight.Medium, 13, 18),
         labelMedium = defaultType.labelMedium.styled(FontWeight.Medium, 12, 16),
         labelSmall = defaultType.labelSmall.styled(size = 10, lineHeight = 14, letterSpacing = 0.3f)
-    )
-    if (scale == 1f) return base
-    fun TextStyle.scaled() = copy(fontSize = fontSize * scale, lineHeight = lineHeight * scale)
-    return base.copy(
-        displayLarge = base.displayLarge.scaled(),
-        displayMedium = base.displayMedium.scaled(),
-        displaySmall = base.displaySmall.scaled(),
-        headlineLarge = base.headlineLarge.scaled(),
-        headlineMedium = base.headlineMedium.scaled(),
-        headlineSmall = base.headlineSmall.scaled(),
-        titleLarge = base.titleLarge.scaled(),
-        titleMedium = base.titleMedium.scaled(),
-        titleSmall = base.titleSmall.scaled(),
-        bodyLarge = base.bodyLarge.scaled(),
-        bodyMedium = base.bodyMedium.scaled(),
-        bodySmall = base.bodySmall.scaled(),
-        labelLarge = base.labelLarge.scaled(),
-        labelMedium = base.labelMedium.scaled(),
-        labelSmall = base.labelSmall.scaled()
     )
 }
