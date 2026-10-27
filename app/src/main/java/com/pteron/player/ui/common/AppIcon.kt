@@ -1,5 +1,12 @@
 package com.pteron.player.ui.common
 
+import android.content.Context
+import androidx.annotation.DrawableRes
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.VectorPainter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -20,6 +27,25 @@ import com.pteron.player.R
 import androidx.compose.material3.MaterialTheme
 
 /**
+ * The logo and wordmark are XML vectors with long paths and gradients. Compose's own cache only
+ * keeps weak references to parsed vectors, so after leaving the Library they were garbage collected
+ * and parsed again on every return -- a visible freeze at the start of the transition back home.
+ * Holding them here keeps the parsed result for the life of the process (a few KB).
+ */
+private object BrandVectors {
+    private val cache = HashMap<Int, ImageVector>()
+
+    fun get(context: Context, @DrawableRes id: Int): ImageVector =
+        cache.getOrPut(id) { ImageVector.vectorResource(context.theme, context.resources, id) }
+}
+
+@Composable
+private fun rememberBrandPainter(@DrawableRes id: Int): VectorPainter {
+    val context = LocalContext.current
+    return rememberVectorPainter(BrandVectors.get(context, id))
+}
+
+/**
  * The Pteron player logo (the rounded tile with the feather and play mark).
  *
  * It is a vector drawable, so it is drawn crisp at any size and costs no bitmap memory -- the old
@@ -28,7 +54,7 @@ import androidx.compose.material3.MaterialTheme
 @Composable
 fun AppIcon(modifier: Modifier = Modifier, size: Dp = 36.dp) {
     Image(
-        painter = painterResource(R.drawable.ic_logo_player),
+        painter = rememberBrandPainter(R.drawable.ic_logo_player),
         contentDescription = "Pteron Player",
         modifier = modifier.size(size)
     )
@@ -43,14 +69,14 @@ fun AppIcon(modifier: Modifier = Modifier, size: Dp = 36.dp) {
 fun PteronWordmark(modifier: Modifier = Modifier, height: Dp = 40.dp) {
     Box(modifier = modifier.height(height).aspectRatio(WordmarkAspect)) {
         Image(
-            painter = painterResource(R.drawable.ic_wordmark_text),
+            painter = rememberBrandPainter(R.drawable.ic_wordmark_text),
             contentDescription = "Pteron",
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Fit,
             colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onBackground)
         )
         Image(
-            painter = painterResource(R.drawable.ic_wordmark_mark),
+            painter = rememberBrandPainter(R.drawable.ic_wordmark_mark),
             contentDescription = null,
             modifier = Modifier.matchParentSize(),
             contentScale = ContentScale.Fit
