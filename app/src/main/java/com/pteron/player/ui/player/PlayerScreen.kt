@@ -284,12 +284,15 @@ fun PlayerScreen(
             val hideAfterMs = uiState.playbackPrefs.controlAutoHideSeconds * 1000L
             val shownAt = android.os.SystemClock.uptimeMillis()
             while (true) {
-                delay(250)
                 val lastActivity = maxOf(shownAt, lastControlsTouchAt[0])
-                if (!scrubbingNow && android.os.SystemClock.uptimeMillis() - lastActivity >= hideAfterMs) {
+                val remaining = hideAfterMs - (android.os.SystemClock.uptimeMillis() - lastActivity)
+                if (!scrubbingNow && remaining <= 0L) {
                     controlsVisible = false
                     break
                 }
+                // Sleep until the controls could actually be due to hide, instead of waking up
+                // four times a second; a touch in the meantime just means one more sleep.
+                delay(if (scrubbingNow) 250L else remaining.coerceAtLeast(50L))
             }
         }
     }
