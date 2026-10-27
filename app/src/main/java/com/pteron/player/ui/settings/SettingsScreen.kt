@@ -550,11 +550,6 @@ private fun ThemeSwatch(theme: AppTheme) {
     )
 }
 
-private val fontSizeOptions = listOf(0.85f to "Small", 1.0f to "Default", 1.15f to "Large", 1.3f to "Extra large")
-
-private fun fontSizeLabel(scale: Float): String =
-    fontSizeOptions.minByOrNull { kotlin.math.abs(it.first - scale) }?.second ?: "Default"
-
 /**
  * The "Font" card. Like the Theme card it unfolds when tapped, showing two cards underneath: one to
  * choose the font (opens the font sheet) and one to choose the text size (opens the size sheet).
