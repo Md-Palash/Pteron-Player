@@ -109,9 +109,6 @@ class MediaStoreRepository(private val context: Context) {
             results
         }
 
-    /** Groups [loadAllVideos] results into folders, mirroring the device's real bucket structure. */
-    suspend fun loadFolders(): List<VideoFolder> = foldersFrom(loadAllVideos())
-
     /**
      * Builds the folder list from videos that are already loaded, so a screen that needs both the
      * videos and the folders reads MediaStore once instead of twice. The folder name comes from the
