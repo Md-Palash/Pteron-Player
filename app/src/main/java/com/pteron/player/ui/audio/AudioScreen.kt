@@ -203,7 +203,7 @@ fun AudioScreen(
                             modifier = Modifier.fillMaxSize(),
                             pills = { AudioTabRow(TabLabels, tab) { tab = it } }
                         ) { topPadding ->
-AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
+AnimatedVisibility(visible = settled, enter = fadeIn(tween(190)), modifier = Modifier.fillMaxSize()) {
                         Crossfade(targetState = tab, modifier = Modifier.fillMaxSize(), animationSpec = tween(200), label = "audioTabContent") { currentTab ->
                         when (currentTab) {
                             TAB_HOME -> AudioHome(
