@@ -105,7 +105,7 @@ fun VideosScreen(
  modifier = Modifier.fillMaxSize(),
  pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
  ) { topPadding ->
-AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
+AnimatedVisibility(visible = settled, enter = fadeIn(tween(190)), modifier = Modifier.fillMaxSize()) {
 when {
                     uiState.errorMessage != null -> ErrorState(uiState.errorMessage!!, onRetry = viewModel::refresh)
                     uiState.isLoading && uiState.videos.isEmpty() -> LoadingState()

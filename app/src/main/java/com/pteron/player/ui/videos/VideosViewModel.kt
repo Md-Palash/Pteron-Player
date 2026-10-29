@@ -44,7 +44,7 @@ data class VideosUiState(
     val visibleVideos: List<VideoItem> = emptyList()
 )
 
-private const val OPEN_ANIMATION_MS = 320L
+private const val OPEN_ANIMATION_MS = 280L
 
 /** Backs the "Videos" bottom-nav tab: every video in the library, regardless of folder. */
 class VideosViewModel(
