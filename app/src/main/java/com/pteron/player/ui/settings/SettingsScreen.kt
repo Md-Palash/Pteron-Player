@@ -138,12 +138,12 @@ private val darkThemes = AppTheme.entries.filter { it.isDark }
  * only added a jittery frame at the start.
  */
 private fun settingsTransition(opening: Boolean): ContentTransform {
-    val slide = tween<IntOffset>(durationMillis = 320, easing = FastOutSlowInEasing)
+    val slide = tween<IntOffset>(durationMillis = 280, easing = FastOutSlowInEasing)
     return if (opening) {
         ContentTransform(
             targetContentEnter = slideInHorizontally(slide) { it / 5 } +
                 fadeIn(tween(260, delayMillis = 40)) +
-                scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = 0.97f),
+                scaleIn(tween(280, easing = FastOutSlowInEasing), initialScale = 0.97f),
             initialContentExit = slideOutHorizontally(slide) { -it / 8 } + fadeOut(tween(140)),
             sizeTransform = null
         )
@@ -151,7 +151,7 @@ private fun settingsTransition(opening: Boolean): ContentTransform {
         ContentTransform(
             targetContentEnter = slideInHorizontally(slide) { -it / 8 } +
                 fadeIn(tween(260, delayMillis = 40)) +
-                scaleIn(tween(320, easing = FastOutSlowInEasing), initialScale = 0.98f),
+                scaleIn(tween(280, easing = FastOutSlowInEasing), initialScale = 0.98f),
             initialContentExit = slideOutHorizontally(slide) { it / 5 } + fadeOut(tween(140)),
             sizeTransform = null
         )
