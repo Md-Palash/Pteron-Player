@@ -37,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -95,7 +96,10 @@ fun LibraryScreen(
         }
     }
 
-    var viewModeOverride by remember { mutableStateOf<ViewMode?>(null) }
+    // rememberSaveable: survives opening a folder and coming back (a plain remember is lost
+    // when the Library leaves the composition).
+    var viewModeOverrideName by rememberSaveable { mutableStateOf<String?>(null) }
+    val viewModeOverride = viewModeOverrideName?.let { runCatching { ViewMode.valueOf(it) }.getOrNull() }
     val effectiveViewMode = viewModeOverride ?: uiState.appearance.viewMode
 
     Scaffold { insets ->
@@ -116,7 +120,7 @@ fun LibraryScreen(
                         CircularActionButton(
                             icon = if (effectiveViewMode == ViewMode.GRID) Icons.Outlined.ViewList else Icons.Outlined.GridView,
                             contentDescription = "Toggle grid or list view",
-                            onClick = { viewModeOverride = if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID }
+                            onClick = { viewModeOverrideName = (if (effectiveViewMode == ViewMode.GRID) ViewMode.LIST else ViewMode.GRID).name }
                         )
                         DarkModeButton(onClick = viewModel::toggleDarkMode)
                     }
@@ -167,7 +171,7 @@ private fun LibraryContent(
     val filtered = uiState.filteredFolders
 
     Column(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = settled, enter = fadeIn(tween(220)), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = settled, enter = fadeIn(tween(190)), modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
         // Narrower than the screen and centered between the two edges.
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
