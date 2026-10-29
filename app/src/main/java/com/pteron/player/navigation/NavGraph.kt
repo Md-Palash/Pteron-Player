@@ -90,7 +90,7 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
  * these are short and the incoming screen waits a beat so the two never muddy each other.
  */
-private const val NavMs = 320
+private const val NavMs = 280
 private val navEase = FastOutSlowInEasing
 
 private fun tabIndex(route: String?): Int = BottomNavDestination.entries.indexOfFirst { it.screen.route == route }
@@ -114,7 +114,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): Ent
         return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
     }
     return slideInHorizontally(tween(NavMs, easing = navEase)) { dir * it / 5 } +
-        fadeIn(tween(240, easing = navEase)) +
+        fadeIn(tween(210, easing = navEase)) +
         scaleIn(tween(NavMs, easing = navEase), initialScale = 0.97f)
 }
 
@@ -158,7 +158,7 @@ private val playerPopExit = fadeOut(tween(120))
 // Pushed pages (Folder, playlists, artist): the page slides in from the right while fading up and
 // settling from slightly smaller; the page underneath drifts left a little (parallax).
 private val pushEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
-    fadeIn(tween(240, easing = navEase)) +
+    fadeIn(tween(210, easing = navEase)) +
     scaleIn(tween(NavMs, easing = navEase), initialScale = 0.96f)
 private val pushExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 
