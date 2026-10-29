@@ -73,7 +73,7 @@ class PlaylistDetailViewModel(
     init {
         viewModelScope.launch {
             // Let the page-open animation finish before the first MediaStore read.
-            delay(320L)
+            delay(280L)
             repository.observe(playlistId).collectLatest { playlist ->
                 if (playlist == null) {
                     _uiState.value = _uiState.value.copy(isLoading = false, notFound = true)
