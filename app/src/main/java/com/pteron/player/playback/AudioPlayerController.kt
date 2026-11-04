@@ -13,6 +13,7 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
+import androidx.media3.common.TrackSelectionParameters
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
@@ -31,6 +32,7 @@ import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import com.pteron.player.ui.audio.warmArtTint
 import com.pteron.player.ui.player.RepeatMode
+import com.pteron.player.util.SleepTimer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -156,9 +158,12 @@ class AudioPlayerController(
     private var loudness: LoudnessEnhancer? = null
     private var bass: BassBoost? = null
     private var virtualizer: Virtualizer? = null
+    private val audioModeEffect = AudioModeEffect()
+    private var offloadOn = false
 
     init {
         AudioSessionHolder.session = session
+        SleepTimer.addListener { player.pause() }
 
         player.addListener(object : Player.Listener {
             override fun onEvents(player: Player, events: Player.Events) = publish()
@@ -208,6 +213,7 @@ class AudioPlayerController(
                 player.skipSilenceEnabled = newPrefs.skipSilence
                 player.setHandleAudioBecomingNoisy(newPrefs.pauseOnHeadphonesUnplugged)
                 applyEffects()
+                updateOffload()
             }
         }
     }
@@ -360,14 +366,41 @@ class AudioPlayerController(
 
     // --- Audio effects -----------------------------------------------------------------------------
 
+    /**
+     * Audio offload hands decoding to the phone's low-power audio DSP, so the CPU can sleep while
+     * music plays with the screen off -- a big battery saving. The DSP path cannot run software
+     * effects, so offload is only switched on while every effect is off.
+     */
+    private fun updateOffload() {
+        val wanted = !prefs.skipSilence && prefs.audioMode.isFlat &&
+            !(prefs.loudnessBoostEnabled && prefs.loudnessBoostLevel > 0f) &&
+            prefs.bassBoostLevel <= 0f && prefs.virtualizerLevel <= 0f
+        if (wanted == offloadOn) return
+        offloadOn = wanted
+        player.experimentalSetOffloadSchedulingEnabled(wanted)
+        player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
+            .setAudioOffloadPreferences(
+                TrackSelectionParameters.AudioOffloadPreferences.Builder()
+                    .setAudioOffloadMode(
+                        if (wanted) TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_ENABLED
+                        else TrackSelectionParameters.AudioOffloadPreferences.AUDIO_OFFLOAD_MODE_DISABLED
+                    )
+                    .setIsGaplessSupportRequired(true)
+                    .build()
+            )
+            .build()
+    }
+
     private fun releaseEffects() {
         loudness?.release(); loudness = null
         bass?.release(); bass = null
         virtualizer?.release(); virtualizer = null
+        audioModeEffect.release()
     }
 
     private fun applyEffects() {
         if (audioSessionId == C.AUDIO_SESSION_ID_UNSET) return
+        audioModeEffect.apply(audioSessionId, prefs.audioMode)
 
         if (prefs.loudnessBoostEnabled && prefs.loudnessBoostLevel > 0f) {
             if (loudness == null) loudness = runCatching { LoudnessEnhancer(audioSessionId) }.getOrNull()
