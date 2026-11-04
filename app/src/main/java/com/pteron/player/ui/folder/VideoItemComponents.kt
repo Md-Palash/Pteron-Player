@@ -68,11 +68,32 @@ private const val GridTileAspect = 1.45f
 
 /** Card chrome shared by the list row and the grid tile: rounded, medium shade, soft outline. */
 @Composable
-private fun Modifier.videoCard(onClick: () -> Unit): Modifier = this
+private fun Modifier.videoCard(selected: Boolean, onLongClick: (() -> Unit)?, onClick: () -> Unit): Modifier = this
     .clip(VideoCardShape)
-    .bouncyClickable(onClick = onClick)
+    .bouncyClickable(onLongClick = onLongClick, onClick = onClick)
     .background(MaterialTheme.colorScheme.surfaceContainer, VideoCardShape)
-    .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f), VideoCardShape)
+    .border(
+        if (selected) 2.dp else 1.dp,
+        if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f),
+        VideoCardShape
+    )
+
+/** The round tick in a card's corner while videos are being selected. */
+@Composable
+private fun SelectionMark(selected: Boolean, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(22.dp)
+            .clip(RoundedCornerShape(50))
+            .background(if (selected) MaterialTheme.colorScheme.primary else Color.Black.copy(alpha = 0.45f))
+            .border(1.5.dp, if (selected) MaterialTheme.colorScheme.primary else Color.White, RoundedCornerShape(50)),
+        contentAlignment = Alignment.Center
+    ) {
+        if (selected) {
+            Icon(Icons.Filled.Check, contentDescription = "Selected", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(14.dp))
+        }
+    }
+}
 
 @Composable
 fun VideoListRow(
@@ -83,6 +104,9 @@ fun VideoListRow(
     onClearProgress: () -> Unit,
     onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    selectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
     /** Extra entries appended to the "..." menu (e.g. playlist actions); call dismiss to close it. */
     extraMenuItems: (@Composable (dismiss: () -> Unit) -> Unit)? = null
 ) {
@@ -90,7 +114,7 @@ fun VideoListRow(
         modifier = modifier
             .fillMaxWidth()
             .height(104.dp)
-            .videoCard(onClick)
+            .videoCard(selected, onLongClick, onClick)
             .padding(ListThumbInset)
     ) {
         Box(
@@ -110,7 +134,9 @@ fun VideoListRow(
             ) {
                 Text(formatTimecode(video.durationMs), style = MaterialTheme.typography.labelSmall, color = Color.White)
             }
-            if (video.isWatched) {
+            if (selectionMode) {
+                SelectionMark(selected, Modifier.align(Alignment.TopStart).padding(4.dp))
+            } else if (video.isWatched) {
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopStart)
@@ -231,12 +257,15 @@ fun VideoGridTile(
     onAddToPlaylist: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
     /** 2 (default) or 3 tiles per row; 3 switches to a more compact tile. */
-    columns: Int = 2
+    columns: Int = 2,
+    selected: Boolean = false,
+    selectionMode: Boolean = false,
+    onLongClick: (() -> Unit)? = null
 ) {
     val compact = columns >= 3
     val buttonSize = if (compact) 24.dp else 28.dp
     // The thumbnail fills the whole card; the title and details sit on a bottom scrim above it.
-    Box(modifier = modifier.aspectRatio(if (compact) 1.05f else GridTileAspect).videoCard(onClick)) {
+    Box(modifier = modifier.aspectRatio(if (compact) 1.05f else GridTileAspect).videoCard(selected, onLongClick, onClick)) {
         ThumbnailImage(contentUri = video.contentUri, modifier = Modifier.fillMaxSize())
 
         // Bottom scrim: keeps the text readable on any thumbnail without a hard edge.
@@ -298,7 +327,9 @@ fun VideoGridTile(
             }
         }
 
-        if (video.isWatched) {
+        if (selectionMode) {
+            SelectionMark(selected, Modifier.align(Alignment.TopStart).padding(6.dp))
+        } else if (video.isWatched) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopStart)
