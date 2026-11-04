@@ -1,10 +1,13 @@
 package com.pteron.player.data.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * A folder on the device that contains one or more videos, as discovered
  * through MediaStore. Folder identity is the absolute bucket path, since
  * Android does not expose a stable folder id for MediaStore queries.
  */
+@Immutable
 data class VideoFolder(
     val bucketId: String,
     val name: String,
@@ -19,6 +22,7 @@ data class VideoFolder(
  * is either read directly from MediaStore/MediaMetadataRetriever or derived
  * from persisted playback state -- nothing is fabricated.
  */
+@Immutable
 data class VideoItem(
     val id: Long,
     val contentUri: String,

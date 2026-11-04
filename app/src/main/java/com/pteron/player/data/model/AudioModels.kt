@@ -1,6 +1,9 @@
 package com.pteron.player.data.model
 
+import androidx.compose.runtime.Immutable
+
 /** One song, backed by a real MediaStore audio row. [isFavorite] is overlaid from saved state. */
+@Immutable
 data class AudioItem(
     val id: Long,
     val contentUri: String,
@@ -15,6 +18,7 @@ data class AudioItem(
 )
 
 /** An artist and the songs that belong to it; [coverContentUri] is the first song, used for its art. */
+@Immutable
 data class AudioArtist(
     val name: String,
     val songCount: Int,
