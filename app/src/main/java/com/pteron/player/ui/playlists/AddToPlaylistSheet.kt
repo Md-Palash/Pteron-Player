@@ -122,6 +122,76 @@ fun AddToPlaylistSheet(video: VideoItem, onDismiss: () -> Unit) {
     }
 }
 
+/**
+ * "Add to playlist" for several videos at once (multi-select). Tapping a playlist adds every
+ * selected video that is not in it yet; "New playlist" creates one holding all of them.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddVideosToPlaylistSheet(videos: List<VideoItem>, onDone: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val repository = remember { (context.applicationContext as PteronApp).playlistRepository }
+    val playlists by repository.playlists.collectAsState(initial = emptyList())
+    val scope = rememberCoroutineScope()
+    var showCreate by remember { mutableStateOf(false) }
+
+    fun toast(message: String) = Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+    val label = "${videos.size} video${if (videos.size == 1) "" else "s"}"
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Text(
+                "Add $label to playlist",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            )
+            PickRow(Icons.Outlined.Add, "New playlist", null, false) { showCreate = true }
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(playlists, key = { it.id }) { playlist ->
+                    PickRow(
+                        icon = Icons.Outlined.PlaylistPlay,
+                        label = playlist.name,
+                        supporting = "${playlist.videoIds.size} video${if (playlist.videoIds.size == 1) "" else "s"}",
+                        selected = videos.all { it.id in playlist.videoIds },
+                        onClick = {
+                            scope.launch {
+                                videos.forEach { repository.addVideo(playlist.id, it.id) }
+                                toast("Added $label to ${playlist.name}")
+                                onDone()
+                                onDismiss()
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    if (showCreate) {
+        PlaylistNameDialog(
+            title = "New playlist",
+            confirmLabel = "Create",
+            onConfirm = { name ->
+                showCreate = false
+                scope.launch {
+                    val id = repository.create(name, firstVideoId = videos.first().id)
+                    videos.drop(1).forEach { repository.addVideo(id, it.id) }
+                    toast("Added $label to ${name.trim()}")
+                    onDone()
+                    onDismiss()
+                }
+            },
+            onDismiss = { showCreate = false }
+        )
+    }
+}
+
 /** Same card language as the other selector sheets: medium shade normally, accent when selected. */
 @Composable
 private fun PickRow(
