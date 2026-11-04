@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Repeat
@@ -85,6 +86,7 @@ import com.pteron.player.playback.AudioPlayerController
 import com.pteron.player.playback.AudioPlayerState
 import com.pteron.player.theme.LocalThemeColors
 import com.pteron.player.theme.readableOn
+import com.pteron.player.ui.common.SleepTimerSheet
 import com.pteron.player.ui.common.bouncyClickable
 import com.pteron.player.ui.player.RepeatMode
 import com.pteron.player.util.formatTimecode
@@ -122,6 +124,7 @@ fun NowPlayingScreen(
     val context = LocalContext.current
     val activity = context as? Activity
     val menu = remember { SongMenuState() }
+    var showSleep by remember { mutableStateOf(false) }
     val themeIsDark = LocalThemeColors.current.isDark
 
     val song = state.current
@@ -176,14 +179,15 @@ fun NowPlayingScreen(
     CompositionLocalProvider(LocalNpContent provides contentColor) {
         Box(modifier = Modifier.fillMaxSize().background(tint)) {
             if (prefs.nowPlayingStyle == NowPlayingStyle.SQUARE) {
-                SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+                SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist) { showSleep = true }
             } else {
-                RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist)
+                RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist) { showSleep = true }
             }
         }
     }
 
     SongMenuHost(menu = menu, viewModel = viewModel, controller = controller, playlists = audioState.playlists)
+    if (showSleep) SleepTimerSheet(onDismiss = { showSleep = false })
 }
 
 // --- Square style: a lifted square cover, controls underneath -----------------------------------
@@ -198,7 +202,8 @@ private fun SquareLayout(
     onBack: () -> Unit,
     onFavorite: () -> Unit,
     onShare: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onSleepTimer: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 64.dp)
@@ -230,6 +235,7 @@ private fun SquareLayout(
                 }
                 NpSquareAction(Icons.Outlined.Share, "Share", onShare)
                 NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
+            NpSquareAction(Icons.Outlined.Bedtime, "Sleep timer", onSleepTimer)
             }
             NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth())
             NpTransport(state, controller, tint, Modifier.fillMaxWidth(), playSquare = true)
@@ -249,7 +255,8 @@ private fun RoundLayout(
     onBack: () -> Unit,
     onFavorite: () -> Unit,
     onShare: () -> Unit,
-    onAddToPlaylist: () -> Unit
+    onAddToPlaylist: () -> Unit,
+    onSleepTimer: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 40.dp),
@@ -281,6 +288,7 @@ private fun RoundLayout(
         Row(modifier = Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
             NpSquareAction(Icons.Outlined.Share, "Share", onShare)
             NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
+            NpSquareAction(Icons.Outlined.Bedtime, "Sleep timer", onSleepTimer)
         }
     }
 }
