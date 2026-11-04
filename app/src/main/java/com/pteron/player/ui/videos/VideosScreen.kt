@@ -1,5 +1,6 @@
 package com.pteron.player.ui.videos
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -32,7 +33,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.SearchCard
+import com.pteron.player.ui.common.SelectionBar
+import com.pteron.player.ui.common.rememberDeleteVideos
+import com.pteron.player.ui.common.shareVideos
+import com.pteron.player.ui.common.toggled
+import com.pteron.player.ui.playlists.AddVideosToPlaylistSheet
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.data.model.ViewMode
 import com.pteron.player.ui.playlists.AddToPlaylistSheet
@@ -63,6 +71,22 @@ fun VideosScreen(
     // `visibleVideos` filters and sorts the whole list on every read, so compute it once per state.
     val visibleVideos = remember(uiState) { uiState.visibleVideos }
 
+    // Multi-select: long press a video to start, tap to add or remove, back to cancel.
+    var selectedIds by remember { mutableStateOf(setOf<Long>()) }
+    val selectionMode = selectedIds.isNotEmpty()
+    val selectedVideos = remember(uiState.videos, selectedIds) { uiState.videos.filter { it.id in selectedIds } }
+    var showMultiPlaylist by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val requestDelete = rememberDeleteVideos(onDeleted = { selectedIds = emptySet() })
+    BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+    if (showMultiPlaylist) {
+        AddVideosToPlaylistSheet(
+            videos = selectedVideos,
+            onDone = { selectedIds = emptySet() },
+            onDismiss = { showMultiPlaylist = false }
+        )
+    }
+
     // The video whose "Add to playlist" sheet is open, if any.
     var playlistTarget by remember { mutableStateOf<VideoItem?>(null) }
     playlistTarget?.let { target ->
@@ -77,7 +101,16 @@ fun VideosScreen(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             Column(Modifier.fillMaxSize()) {
-                Row(
+                if (selectionMode) {
+                    SelectionBar(
+                        count = selectedIds.size,
+                        onClose = { selectedIds = emptySet() },
+                        onSelectAll = { selectedIds = visibleVideos.map { it.id }.toSet() },
+                        onAddToPlaylist = { showMultiPlaylist = true },
+                        onShare = { shareVideos(context, selectedVideos) },
+                        onDelete = requestDelete?.let { delete -> { delete(selectedVideos) } }
+                    )
+                } else Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
@@ -101,6 +134,13 @@ fun VideosScreen(
                 }
 
                 
+                Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+                    SearchCard(
+                        value = uiState.searchQuery,
+                        onValueChange = viewModel::onSearchQueryChange,
+                        placeholder = "Search videos..."
+                    )
+                }
                 FloatingPills(
  modifier = Modifier.fillMaxSize(),
  pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
@@ -122,7 +162,16 @@ when {
                             items(visibleVideos, key = { it.id }) { video ->
                                 VideoGridTile(
                                     video = video,
-                                    onClick = { onOpenVideo(video.id, video.bucketId) },
+                                    onClick = {
+                                    if (selectionMode) {
+                                        selectedIds = selectedIds.toggled(video.id)
+                                    } else {
+                                        onOpenVideo(video.id, video.bucketId)
+                                    }
+                                },
+                                selected = video.id in selectedIds,
+                                selectionMode = selectionMode,
+                                onLongClick = { selectedIds = selectedIds + video.id },
                                     onToggleFavorite = { viewModel.toggleFavorite(video) },
                                     onToggleWatched = { viewModel.toggleWatched(video) },
                                     onClearProgress = { viewModel.clearProgress(video) },
@@ -139,7 +188,16 @@ when {
                             items(visibleVideos, key = { it.id }) { video ->
                                 VideoListRow(
                                     video = video,
-                                    onClick = { onOpenVideo(video.id, video.bucketId) },
+                                    onClick = {
+                                    if (selectionMode) {
+                                        selectedIds = selectedIds.toggled(video.id)
+                                    } else {
+                                        onOpenVideo(video.id, video.bucketId)
+                                    }
+                                },
+                                selected = video.id in selectedIds,
+                                selectionMode = selectionMode,
+                                onLongClick = { selectedIds = selectedIds + video.id },
                                     onToggleFavorite = { viewModel.toggleFavorite(video) },
                                     onToggleWatched = { viewModel.toggleWatched(video) },
                                     onClearProgress = { viewModel.clearProgress(video) },
