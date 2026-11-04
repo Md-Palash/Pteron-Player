@@ -171,7 +171,7 @@ private fun LibraryContent(
     val filtered = uiState.filteredFolders
 
     Column(modifier = Modifier.fillMaxSize()) {
-        AnimatedVisibility(visible = settled, enter = fadeIn(tween(190)), modifier = Modifier.fillMaxSize()) {
+        AnimatedVisibility(visible = settled, enter = fadeIn(tween(160)), modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxSize()) {
         // Narrower than the screen and centered between the two edges.
         Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
