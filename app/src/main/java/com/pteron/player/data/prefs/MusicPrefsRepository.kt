@@ -35,7 +35,9 @@ data class MusicPrefsState(
     val keepScreenOnInNowPlaying: Boolean = false,
     /** Jump to the Now Playing screen as soon as a song is started from a list. */
     val openNowPlayingOnPlay: Boolean = true,
-    val nowPlayingStyle: NowPlayingStyle = NowPlayingStyle.CIRCLE
+    val nowPlayingStyle: NowPlayingStyle = NowPlayingStyle.CIRCLE,
+    /** Equalizer preset applied to the music player's sound. */
+    val audioMode: AudioMode = AudioMode.DEFAULT
 )
 
 /** Settings > Music Player. Each control reads and writes a real key that the audio player applies. */
@@ -52,6 +54,7 @@ class MusicPrefsRepository(private val context: Context) {
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on_now_playing")
         val OPEN_NOW_PLAYING = booleanPreferencesKey("open_now_playing_on_play")
         val NOW_PLAYING_STYLE = stringPreferencesKey("now_playing_style")
+        val AUDIO_MODE = stringPreferencesKey("audio_mode")
     }
 
     val state: Flow<MusicPrefsState> = context.musicPrefsDataStore.data.map { p ->
@@ -67,7 +70,8 @@ class MusicPrefsRepository(private val context: Context) {
             openNowPlayingOnPlay = p[Keys.OPEN_NOW_PLAYING] ?: true,
             nowPlayingStyle = runCatching {
                 NowPlayingStyle.valueOf(p[Keys.NOW_PLAYING_STYLE] ?: NowPlayingStyle.CIRCLE.name)
-            }.getOrDefault(NowPlayingStyle.CIRCLE)
+            }.getOrDefault(NowPlayingStyle.CIRCLE),
+            audioMode = AudioMode.fromName(p[Keys.AUDIO_MODE])
         )
     }
 
@@ -81,6 +85,8 @@ class MusicPrefsRepository(private val context: Context) {
     suspend fun setKeepScreenOnInNowPlaying(value: Boolean) = edit { it[Keys.KEEP_SCREEN_ON] = value }
     suspend fun setOpenNowPlayingOnPlay(value: Boolean) = edit { it[Keys.OPEN_NOW_PLAYING] = value }
     suspend fun setNowPlayingStyle(style: NowPlayingStyle) = edit { it[Keys.NOW_PLAYING_STYLE] = style.name }
+
+    suspend fun setAudioMode(mode: AudioMode) = edit { it[Keys.AUDIO_MODE] = mode.name }
 
     private suspend fun edit(block: (MutablePreferences) -> Unit) {
         context.musicPrefsDataStore.edit(block)

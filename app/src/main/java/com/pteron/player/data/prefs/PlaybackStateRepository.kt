@@ -2,14 +2,24 @@ package com.pteron.player.data.prefs
 
 import android.content.Context
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
 private val Context.playbackDataStore by preferencesDataStore(name = "playback_state")
+
+// Audio / subtitle / speed choices live in their own small file, so the position saves that happen
+// every few seconds during playback never rewrite them.
+private val Context.videoTrackDataStore by preferencesDataStore(name = "video_track_prefs")
+
+/** What the person picked for one video: "group:track" for audio, "group:track" or "off" for subtitles. */
+data class VideoTrackPrefs(val audio: String? = null, val subtitle: String? = null, val speed: Float? = null)
 
 data class VideoPlaybackState(
     val lastPositionMs: Long = 0L,
@@ -115,8 +125,33 @@ class PlaybackStateRepository(private val context: Context) {
         context.playbackDataStore.edit { prefs -> prefs.remove(positionKey(id)) }
     }
 
+    suspend fun trackPrefs(id: Long): VideoTrackPrefs {
+        val prefs = context.videoTrackDataStore.data.first()
+        return VideoTrackPrefs(
+            audio = prefs[stringPreferencesKey("a_$id")],
+            subtitle = prefs[stringPreferencesKey("s_$id")],
+            speed = prefs[floatPreferencesKey("sp_$id")]
+        )
+    }
+
+    suspend fun saveAudioChoice(id: Long, group: Int, track: Int) {
+        context.videoTrackDataStore.edit { it[stringPreferencesKey("a_$id")] = "$group:$track" }
+    }
+
+    /** [group] null means subtitles were switched off. */
+    suspend fun saveSubtitleChoice(id: Long, group: Int?, track: Int?) {
+        context.videoTrackDataStore.edit {
+            it[stringPreferencesKey("s_$id")] = if (group == null || track == null) "off" else "$group:$track"
+        }
+    }
+
+    suspend fun saveSpeed(id: Long, speed: Float) {
+        context.videoTrackDataStore.edit { it[floatPreferencesKey("sp_$id")] = speed }
+    }
+
     /** Wipes all resume positions, watched flags, and favorites -- the Settings "clear history" action. */
     suspend fun clearAll() {
         context.playbackDataStore.edit { it.clear() }
+        context.videoTrackDataStore.edit { it.clear() }
     }
 }

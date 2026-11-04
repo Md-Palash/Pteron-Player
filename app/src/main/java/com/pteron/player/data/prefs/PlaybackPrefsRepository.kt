@@ -19,6 +19,13 @@ enum class OrientationLock(val displayName: String) {
     LANDSCAPE("Always landscape")
 }
 
+/** How subtitles are drawn on top of the picture. */
+enum class SubtitleStyle(val displayName: String) {
+    CLASSIC("White"),
+    YELLOW("Yellow"),
+    BOXED("Boxed")
+}
+
 data class PlaybackPrefsState(
     val resumePlaybackEnabled: Boolean = true,
     val autoPlayNext: Boolean = true,
@@ -34,7 +41,10 @@ data class PlaybackPrefsState(
     val controlAutoHideSeconds: Int = 4,
     /** Keep audio playing (video decode off) when the app is minimized, the screen locks, or a
      *  floating Picture-in-Picture window is closed -- like a music player, instead of pausing. */
-    val backgroundPlaybackEnabled: Boolean = false
+    val backgroundPlaybackEnabled: Boolean = false,
+    /** Equalizer preset applied to the video player's sound. */
+    val audioMode: AudioMode = AudioMode.DEFAULT,
+    val subtitleStyle: SubtitleStyle = SubtitleStyle.CLASSIC
 )
 
 /**
@@ -56,6 +66,8 @@ class PlaybackPrefsRepository(private val context: Context) {
         val DEFAULT_ASPECT_RATIO = stringPreferencesKey("default_aspect_ratio")
         val CONTROL_AUTO_HIDE_SECONDS = intPreferencesKey("control_auto_hide_seconds")
         val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback_enabled")
+        val AUDIO_MODE = stringPreferencesKey("audio_mode")
+        val SUBTITLE_STYLE = stringPreferencesKey("subtitle_style")
     }
 
     val state: Flow<PlaybackPrefsState> = context.playbackPrefsDataStore.data.map { prefs ->
@@ -74,7 +86,11 @@ class PlaybackPrefsRepository(private val context: Context) {
                 AspectRatioMode.valueOf(prefs[Keys.DEFAULT_ASPECT_RATIO] ?: AspectRatioMode.FILL.name)
             }.getOrDefault(AspectRatioMode.FILL),
             controlAutoHideSeconds = prefs[Keys.CONTROL_AUTO_HIDE_SECONDS] ?: 4,
-            backgroundPlaybackEnabled = prefs[Keys.BACKGROUND_PLAYBACK] ?: false
+            backgroundPlaybackEnabled = prefs[Keys.BACKGROUND_PLAYBACK] ?: false,
+            audioMode = AudioMode.fromName(prefs[Keys.AUDIO_MODE]),
+            subtitleStyle = runCatching {
+                SubtitleStyle.valueOf(prefs[Keys.SUBTITLE_STYLE] ?: SubtitleStyle.CLASSIC.name)
+            }.getOrDefault(SubtitleStyle.CLASSIC)
         )
     }
 
@@ -89,6 +105,9 @@ class PlaybackPrefsRepository(private val context: Context) {
     suspend fun setDefaultAspectRatio(mode: AspectRatioMode) = edit { it[Keys.DEFAULT_ASPECT_RATIO] = mode.name }
     suspend fun setControlAutoHideSeconds(seconds: Int) = edit { it[Keys.CONTROL_AUTO_HIDE_SECONDS] = seconds.coerceIn(1, 15) }
     suspend fun setBackgroundPlaybackEnabled(value: Boolean) = edit { it[Keys.BACKGROUND_PLAYBACK] = value }
+
+    suspend fun setAudioMode(mode: AudioMode) = edit { it[Keys.AUDIO_MODE] = mode.name }
+    suspend fun setSubtitleStyle(style: SubtitleStyle) = edit { it[Keys.SUBTITLE_STYLE] = style.name }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
         context.playbackPrefsDataStore.edit(block)
