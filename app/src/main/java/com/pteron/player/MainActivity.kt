@@ -1,12 +1,13 @@
 package com.pteron.player
 
-import android.app.PictureInPictureParams
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.drawable.ColorDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.util.Rational
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -19,8 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.media3.common.util.UnstableApi
 import com.pteron.player.navigation.PteronNavGraph
 import androidx.compose.ui.graphics.toArgb
+import androidx.core.content.ContextCompat
 import com.pteron.player.theme.PteronTheme
 import com.pteron.player.theme.colors
+import com.pteron.player.util.PipActions
 import com.pteron.player.util.PipController
 import kotlinx.coroutines.flow.MutableStateFlow
 
@@ -30,9 +33,19 @@ class MainActivity : ComponentActivity() {
     /** A video handed to us by another app (ACTION_VIEW), waiting for the nav graph to open it. */
     private val pendingExternalVideo = MutableStateFlow<Uri?>(null)
 
+    /** Play / pause button of the Picture-in-Picture window. */
+    private val pipReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == PipActions.ACTION_TOGGLE) PipController.togglePlayPause?.invoke()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        ContextCompat.registerReceiver(
+            this, pipReceiver, IntentFilter(PipActions.ACTION_TOGGLE), ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         val app = application as PteronApp
 
@@ -66,6 +79,11 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onDestroy() {
+        runCatching { unregisterReceiver(pipReceiver) }
+        super.onDestroy()
+    }
+
     // launchMode="singleTop": a second "Open with" while the app is already running lands here.
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -93,11 +111,7 @@ class MainActivity : ComponentActivity() {
             PipController.isEligibleForAutoPip.value &&
             !PipController.backgroundPlaybackEnabled.value
         ) {
-            val aspect = PipController.videoAspectRatio.value.coerceIn(0.42f, 2.39f)
-            val params = PictureInPictureParams.Builder()
-                .setAspectRatio(Rational((aspect * 100).toInt(), 100))
-                .build()
-            enterPictureInPictureMode(params)
+            enterPictureInPictureMode(PipActions.params(this, PipController.videoAspectRatio.value, true))
         }
     }
 }
