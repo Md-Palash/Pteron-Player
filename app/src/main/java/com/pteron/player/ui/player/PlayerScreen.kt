@@ -12,7 +12,23 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import com.pteron.player.data.prefs.SubtitleStyle
+import com.pteron.player.ui.common.SleepTimerSheet
+import com.pteron.player.ui.player.components.SeekPreviewLoader
+import com.pteron.player.util.PipActions
+import com.pteron.player.util.SleepTimer
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -129,6 +145,11 @@ fun PlayerScreen(
     var showSubtitleSheet by remember { mutableStateOf(false) }
     var flashSide by remember { mutableStateOf(SeekFlashSide.NONE) }
     var scrubPreviewMs by remember { mutableStateOf<Long?>(null) }
+    var zoom by remember { mutableFloatStateOf(1f) }
+    var showSleepSheet by remember { mutableStateOf(false) }
+    val sleepEndsAt by SleepTimer.endsAt.collectAsState()
+    val previewLoader = remember { SeekPreviewLoader(context.applicationContext) }
+    var previewFrame by remember { mutableStateOf<ImageBitmap?>(null) }
 
     var brightnessLevel by remember { mutableStateOf(0.5f) }
     var showBrightnessHud by remember { mutableStateOf(false) }
@@ -314,6 +335,38 @@ fun PlayerScreen(
     val aspectMode by remember { derivedStateOf { uiState.aspectRatioMode } }
     val subtitlesEnabled by remember { derivedStateOf { uiState.subtitlesEnabled } }
     val subtitleTextSize by remember { derivedStateOf { uiState.playbackPrefs.subtitleTextSizeSp } }
+    val subtitleStyle by remember { derivedStateOf { uiState.playbackPrefs.subtitleStyle } }
+
+    // The play / pause button inside the Picture-in-Picture window.
+    DisposableEffect(viewModel) {
+        PipController.togglePlayPause = viewModel::playPause
+        onDispose { PipController.togglePlayPause = null }
+    }
+    LaunchedEffect(uiState.isPlaying) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            runCatching {
+                activity?.setPictureInPictureParams(
+                    PipActions.params(context, PipController.videoAspectRatio.value, uiState.isPlaying)
+                )
+            }
+        }
+    }
+
+    // Preview picture above the seek bar: loaded a moment after the finger settles, closed on exit.
+    DisposableEffect(previewLoader) { onDispose { previewLoader.release() } }
+    val currentUri = uiState.currentVideo?.contentUri
+    LaunchedEffect(currentUri) {
+        previewFrame = null
+        if (currentUri == null) return@LaunchedEffect
+        snapshotFlow { scrubPreviewMs }.collectLatest { ms ->
+            if (ms == null) {
+                previewFrame = null
+            } else {
+                delay(70)
+                previewLoader.frameAt(currentUri, ms)?.let { previewFrame = it.asImageBitmap() }
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -360,9 +413,16 @@ fun PlayerScreen(
                     val visibility = if (subtitlesEnabled) android.view.View.VISIBLE else android.view.View.GONE
                     if (subtitleView.visibility != visibility) subtitleView.visibility = visibility
                     subtitleView.setFixedTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, subtitleTextSize)
+                    subtitleView.setStyle(captionStyleFor(subtitleStyle))
                 }
             },
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                // Pinch zoom: read in the draw phase only, so zooming never recomposes the screen.
+                .graphicsLayer {
+                    scaleX = zoom
+                    scaleY = zoom
+                }
         )
 
         if (!isInPip) {
@@ -380,6 +440,8 @@ fun PlayerScreen(
                 onScrubPreview = { scrubPreviewMs = it },
                 onScrubCommit = { viewModel.seekTo(it) },
                 onFlash = { flashSide = it },
+                onHoldSpeed = viewModel::setHoldSpeed,
+                onPinchZoom = { zoom = (zoom * it).coerceIn(1f, 4f) },
                 onBrightnessChanged = {
                     brightnessLevel = it
                     showBrightnessHud = true
@@ -414,16 +476,47 @@ fun PlayerScreen(
             )
 
             scrubPreviewMs?.let { previewMs ->
+                Column(
+                    modifier = Modifier.align(Alignment.Center),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    previewFrame?.let { frame ->
+                        Image(
+                            bitmap = frame,
+                            contentDescription = null,
+                            contentScale = ContentScale.Fit,
+                            modifier = Modifier
+                                .width(190.dp)
+                                .clip(androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+                        )
+                        androidx.compose.foundation.layout.Spacer(Modifier.size(6.dp))
+                    }
+                    Box(
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                    ) {
+                        Text(
+                            text = formatTimecode(previewMs),
+                            color = Color.White,
+                            style = MaterialTheme.typography.titleLarge,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        )
+                    }
+                }
+            }
+
+            if (uiState.isHoldingSpeed) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                        .align(Alignment.TopCenter)
+                        .padding(top = 56.dp)
+                        .background(Color.Black.copy(alpha = 0.6f), androidx.compose.foundation.shape.RoundedCornerShape(50))
                 ) {
                     Text(
-                        text = formatTimecode(previewMs),
+                        text = "2x \u25B6\u25B6",
                         color = Color.White,
-                        style = MaterialTheme.typography.titleLarge,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                     )
                 }
             }
@@ -490,12 +583,17 @@ fun PlayerScreen(
                     onOpenSpeedMenu = { showSpeedSheet = true },
                     onToggleLock = { isLocked = !isLocked; controlsVisible = true },
                     onEnterPip = {
-                        activity?.let { enterPictureInPicture(it) }
+                        activity?.let { enterPictureInPicture(it, uiState.isPlaying) }
                     },
+                    onOpenSleepTimer = { showSleepSheet = true },
+                    sleepTimerActive = sleepEndsAt != null,
                     onToggleRotation = {
                         activity?.let { toggleOrientation(it) }
                     },
-                    onCycleAspectRatio = viewModel::cycleAspectRatio,
+                    onCycleAspectRatio = {
+                        viewModel.cycleAspectRatio()
+                        zoom = 1f
+                    },
                     onToggleMute = viewModel::toggleMute,
                     onCycleRepeat = viewModel::cycleRepeatMode,
                     onToggleShuffle = viewModel::toggleShuffle
@@ -541,6 +639,7 @@ fun PlayerScreen(
         }
     }
 
+    if (showSleepSheet) SleepTimerSheet(onDismiss = { showSleepSheet = false })
     if (showSpeedSheet) {
         SpeedSelectorSheet(
             currentSpeed = uiState.playbackSpeed,
@@ -616,14 +715,28 @@ private fun toggleOrientation(activity: Activity) {
     }
 }
 
-private fun enterPictureInPicture(activity: Activity) {
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-        val aspect = PipController.videoAspectRatio.value.coerceIn(0.42f, 2.39f)
-        val params = android.app.PictureInPictureParams.Builder()
-            .setAspectRatio(android.util.Rational((aspect * 100).toInt(), 100))
-            .build()
-        activity.enterPictureInPictureMode(params)
+private fun enterPictureInPicture(activity: Activity, playing: Boolean) {
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        activity.enterPictureInPictureMode(
+            PipActions.params(activity, PipController.videoAspectRatio.value, playing)
+        )
     }
+}
+
+/** Subtitle looks: white or yellow text with an outline, or white text on a dark box. */
+private fun captionStyleFor(style: SubtitleStyle): CaptionStyleCompat = when (style) {
+    SubtitleStyle.CLASSIC -> CaptionStyleCompat(
+        android.graphics.Color.WHITE, android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+        CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, null
+    )
+    SubtitleStyle.YELLOW -> CaptionStyleCompat(
+        0xFFFFEB3B.toInt(), android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT,
+        CaptionStyleCompat.EDGE_TYPE_OUTLINE, android.graphics.Color.BLACK, null
+    )
+    SubtitleStyle.BOXED -> CaptionStyleCompat(
+        android.graphics.Color.WHITE, 0xB3000000.toInt(), android.graphics.Color.TRANSPARENT,
+        CaptionStyleCompat.EDGE_TYPE_NONE, android.graphics.Color.BLACK, null
+    )
 }
 
 /** Resolves a human-readable file name for a SAF-picked Uri, for the subtitle-track label. */

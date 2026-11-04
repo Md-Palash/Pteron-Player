@@ -34,9 +34,11 @@ import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.data.prefs.PlaybackStateRepository
 import com.pteron.player.data.prefs.PlaylistRepository
+import com.pteron.player.playback.AudioModeEffect
 import com.pteron.player.playback.PlaybackSessionHolder
 import com.pteron.player.playback.PlaybackSessionService
 import com.pteron.player.util.PipController
+import com.pteron.player.util.SleepTimer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -90,7 +92,9 @@ data class PlayerUiState(
     /** Video frame rate reported by the selected track's format, if any. */
     val frameRate: Float? = null,
     /** True while the selected video track is HDR (HDR10 / HLG): the window then switches to HDR color. */
-    val isHdr: Boolean = false
+    val isHdr: Boolean = false,
+    /** True while a long press holds the video at fast-forward speed. */
+    val isHoldingSpeed: Boolean = false
 )
 
 /** The fast-changing part of the player state (updated about once per second while visible). */
@@ -106,7 +110,10 @@ const val NO_PLAYLIST = -1L
 private const val EXTERNAL_VIDEO_ID = -1L
 
 /** How often the playback position is written to disk while playing. */
-private const val POSITION_SAVE_INTERVAL_MS = 5_000L
+private const val POSITION_SAVE_INTERVAL_MS = 10_000L
+
+/** Speed while the picture is held with a long press. */
+private const val HOLD_SPEED = 2f
 
 /** A saved position this close to the end is treated as "finished": the next open starts from 0. */
 private const val RESUME_END_GUARD_MS = 5_000L
@@ -197,10 +204,16 @@ class PlayerViewModel(
     private val _progress = MutableStateFlow(PlayerProgress())
     val progress: StateFlow<PlayerProgress> = _progress.asStateFlow()
 
+    private val sleepTimerListener: () -> Unit = { player.pause() }
+
     /** mediaId (VideoItem.id.toString()) -> VideoItem, rebuilt each time a playlist is opened. */
     private var videoLookup: Map<String, VideoItem> = emptyMap()
     private var positionTickerJob: Job? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
+    private val audioModeEffect = AudioModeEffect()
+
+    /** The video whose remembered audio / subtitle choice was already applied. */
+    private var appliedTrackPrefsFor: Long? = null
     private var audioSessionId: Int = C.AUDIO_SESSION_ID_UNSET
     private var volumeBeforeMute: Float = 1f
     private var lastRecordedSubtitles: Pair<Long, Boolean>? = null
@@ -219,6 +232,7 @@ class PlayerViewModel(
 
     init {
         PlaybackSessionHolder.session = mediaSession
+        SleepTimer.addListener(sleepTimerListener)
         runCatching { application.startService(Intent(application, PlaybackSessionService::class.java)) }
 
         viewModelScope.launch {
@@ -238,6 +252,7 @@ class PlayerViewModel(
                     aspectRatioMode = if (startingUp) prefs.defaultAspectRatio else _uiState.value.aspectRatioMode
                 )
                 applyAudioBoost(prefs.audioBoostEnabled, prefs.audioBoostLevel)
+                audioModeEffect.apply(audioSessionId, prefs.audioMode)
                 // Read synchronously by MainActivity.onUserLeaveHint(), a plain (non-suspend)
                 // Activity callback, to decide whether to skip auto-PiP in favor of plain
                 // background audio.
@@ -306,6 +321,7 @@ class PlayerViewModel(
                     frameRate = null,
                     error = null
                 )
+                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_REPEAT) applyVideoSpeed(nextVideo)
 
                 // "Auto-play next" off means: land on the next item but don't start it --
                 // the queue still advances (so shuffle/repeat-all keep working structurally),
@@ -344,6 +360,14 @@ class PlayerViewModel(
                     frameRate = selectedVideoFrameRate(tracks) ?: _uiState.value.frameRate,
                     isHdr = selectedVideoIsHdr(tracks)
                 )
+                // Once per video: bring back the audio / subtitle track the person chose last time.
+                val restoreFor = _uiState.value.currentVideo
+                if (restoreFor != null && restoreFor.id != EXTERNAL_VIDEO_ID &&
+                    tracks.groups.isNotEmpty() && appliedTrackPrefsFor != restoreFor.id
+                ) {
+                    appliedTrackPrefsFor = restoreFor.id
+                    viewModelScope.launch { restoreTrackChoices(restoreFor.id) }
+                }
                 // Tracks arrive empty while a video is still preparing -- that must not be recorded as
                 // "no subtitles". And each (video, answer) pair is written once, not on every
                 // tracks update, which saves a DataStore write per change.
@@ -661,6 +685,63 @@ class PlayerViewModel(
     fun setPlaybackSpeed(speed: Float) {
         player.playbackParameters = player.playbackParameters.withSpeed(speed)
         _uiState.value = _uiState.value.copy(playbackSpeed = speed)
+        saveForCurrentVideo { playbackStateRepository.saveSpeed(it, speed) }
+    }
+
+    /** Long press on the picture: 2x while held, back to the chosen speed on release. */
+    fun setHoldSpeed(active: Boolean) {
+        val state = _uiState.value
+        if (state.isHoldingSpeed == active) return
+        if (active && !player.isPlaying) return
+        player.playbackParameters = player.playbackParameters.withSpeed(if (active) HOLD_SPEED else state.playbackSpeed)
+        _uiState.value = state.copy(isHoldingSpeed = active)
+    }
+
+    private fun saveForCurrentVideo(block: suspend (Long) -> Unit) {
+        val video = _uiState.value.currentVideo ?: return
+        if (video.id == EXTERNAL_VIDEO_ID) return
+        viewModelScope.launch { block(video.id) }
+    }
+
+    /** A video plays at the speed saved for it, or at the default speed from Settings. */
+    private fun applyVideoSpeed(video: VideoItem) {
+        if (video.id == EXTERNAL_VIDEO_ID) return
+        viewModelScope.launch {
+            val saved = playbackStateRepository.trackPrefs(video.id).speed
+            val state = _uiState.value
+            if (state.currentVideo?.id != video.id || state.isHoldingSpeed) return@launch
+            val speed = saved ?: state.appearance.defaultPlaybackSpeed
+            if (speed != state.playbackSpeed || player.playbackParameters.speed != speed) {
+                player.playbackParameters = player.playbackParameters.withSpeed(speed)
+                _uiState.value = _uiState.value.copy(playbackSpeed = speed)
+            }
+        }
+    }
+
+    private suspend fun restoreTrackChoices(videoId: Long) {
+        val saved = playbackStateRepository.trackPrefs(videoId)
+        if (_uiState.value.currentVideo?.id != videoId) return
+        val groups = player.currentTracks.groups
+        fun parse(choice: String?, type: Int): TrackOption? {
+            val parts = choice?.split(':')?.mapNotNull { it.toIntOrNull() } ?: return null
+            if (parts.size != 2) return null
+            val group = groups.getOrNull(parts[0]) ?: return null
+            if (group.type != type || parts[1] !in 0 until group.length) return null
+            return TrackOption(parts[0], parts[1], "", true)
+        }
+        parse(saved.audio, C.TRACK_TYPE_AUDIO)?.let { selectAudioTrack(it, persist = false) }
+        when {
+            saved.subtitle == "off" -> selectSubtitleTrack(null, persist = false)
+            saved.subtitle != null -> parse(saved.subtitle, C.TRACK_TYPE_TEXT)?.let { selectSubtitleTrack(it, persist = false) }
+            // Nothing saved for this video: undo a "subtitles off" left over from the previous one.
+            !_uiState.value.subtitlesEnabled -> {
+                trackSelector.parameters = trackSelector.parameters.buildUpon()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, false)
+                    .clearOverridesOfType(C.TRACK_TYPE_TEXT)
+                    .build()
+                _uiState.value = _uiState.value.copy(subtitlesEnabled = true)
+            }
+        }
     }
 
     fun cycleAspectRatio() {
@@ -672,7 +753,7 @@ class PlayerViewModel(
         _uiState.value = _uiState.value.copy(aspectRatioMode = next)
     }
 
-    fun selectAudioTrack(option: TrackOption) {
+    fun selectAudioTrack(option: TrackOption, persist: Boolean = true) {
         trackSelector.parameters = trackSelector.parameters.buildUpon()
             .setOverrideForType(
                 TrackSelectionOverride(
@@ -681,9 +762,11 @@ class PlayerViewModel(
                 )
             )
             .build()
+        if (persist) saveForCurrentVideo { playbackStateRepository.saveAudioChoice(it, option.groupIndex, option.trackIndex) }
     }
 
-    fun selectSubtitleTrack(option: TrackOption?) {
+    fun selectSubtitleTrack(option: TrackOption?, persist: Boolean = true) {
+        if (persist) saveForCurrentVideo { playbackStateRepository.saveSubtitleChoice(it, option?.groupIndex, option?.trackIndex) }
         val builder = trackSelector.parameters.buildUpon()
         if (option == null) {
             builder.setTrackTypeDisabled(C.TRACK_TYPE_TEXT, true)
@@ -814,8 +897,10 @@ class PlayerViewModel(
         audioSessionId = newAudioSessionId
         loudnessEnhancer?.release()
         loudnessEnhancer = null
+        audioModeEffect.release()
         val prefs = _uiState.value.playbackPrefs
         applyAudioBoost(prefs.audioBoostEnabled, prefs.audioBoostLevel)
+        audioModeEffect.apply(newAudioSessionId, prefs.audioMode)
     }
 
     private fun applyAudioBoost(enabled: Boolean, level: Float) {
@@ -906,6 +991,8 @@ class PlayerViewModel(
         stopPositionTicker()
         loudnessEnhancer?.release()
         loudnessEnhancer = null
+        audioModeEffect.release()
+        SleepTimer.removeListener(sleepTimerListener)
         // Only tear down the shared session/service if a newer player hasn't already taken over
         // (opening another video replaces this screen; its ViewModel is created first).
         val ownsSession = PlaybackSessionHolder.session === mediaSession
