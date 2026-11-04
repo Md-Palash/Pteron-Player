@@ -4,6 +4,9 @@ import android.app.Activity
 import android.content.Context
 import android.media.AudioManager
 import android.provider.Settings
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -15,7 +18,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChanged
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
@@ -65,7 +72,11 @@ fun GestureOverlay(
     onScrubCommit: (Long) -> Unit,
     onFlash: (SeekFlashSide) -> Unit,
     onBrightnessChanged: (Float) -> Unit,
-    onVolumeChanged: (Float, Int, Int) -> Unit
+    onVolumeChanged: (Float, Int, Int) -> Unit,
+    /** True while a long press holds the video at fast speed, false on release. */
+    onHoldSpeed: (Boolean) -> Unit = {},
+    /** Zoom factor of a two-finger pinch since the last event (1 = unchanged). */
+    onPinchZoom: (Float) -> Unit = {}
 ) {
     val context = LocalContext.current
     val activity = context as? Activity
@@ -85,12 +96,34 @@ fun GestureOverlay(
     val flash by rememberUpdatedState(onFlash)
     val brightnessChanged by rememberUpdatedState(onBrightnessChanged)
     val volumeChanged by rememberUpdatedState(onVolumeChanged)
+    val holdSpeed by rememberUpdatedState(onHoldSpeed)
+    val pinchZoom by rememberUpdatedState(onPinchZoom)
+    val haptics = LocalHapticFeedback.current
 
     Box(
         modifier = modifier
             .fillMaxSize()
+            // Two-finger pinch zoom. Watches in the Initial pass and consumes while two fingers are
+            // down, so the one-finger drag handlers below never see (and misread) a pinch.
+            .pointerInput(locked) {
+                if (locked) return@pointerInput
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    do {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.changes.count { it.pressed } >= 2) {
+                            val zoom = event.calculateZoom()
+                            if (zoom != 1f) {
+                                pinchZoom(zoom)
+                                event.changes.forEach { if (it.positionChanged()) it.consume() }
+                            }
+                        }
+                    } while (event.changes.any { it.pressed })
+                }
+            }
             .pointerInput(locked) {
                 val onDoubleTapHandler: (Offset) -> Unit = { offset ->
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     val third = size.width / 3f
                     val side = when {
                         offset.x < third -> SeekFlashSide.LEFT
@@ -114,7 +147,25 @@ fun GestureOverlay(
                 }
                 // While locked there is no double tap, so a single tap is reported immediately
                 // (no wait for a possible second tap) to show the unlock button.
+                var holding = false
                 detectTapGestures(
+                    // Press and hold: 2x speed for as long as the finger stays down.
+                    onPress = {
+                        if (!locked) {
+                            val holdJob = scope.launch {
+                                delay(viewConfiguration.longPressTimeoutMillis + 120)
+                                holding = true
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                holdSpeed(true)
+                            }
+                            tryAwaitRelease()
+                            holdJob.cancel()
+                            if (holding) {
+                                holding = false
+                                holdSpeed(false)
+                            }
+                        }
+                    },
                     onTap = { toggleControls() },
                     onDoubleTap = if (locked) null else onDoubleTapHandler
                 )
@@ -139,6 +190,7 @@ fun GestureOverlay(
                 fun scrub(dx: Float) {
                     val duration = durationNow
                     if (duration <= 0L) return
+                    if (!scrubbing) haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     scrubbing = true
                     // A full-width drag covers roughly 2 minutes of footage at 1.0x sensitivity.
                     val msPerPx = (120_000f / size.width.coerceAtLeast(1)) * sensitivityNow

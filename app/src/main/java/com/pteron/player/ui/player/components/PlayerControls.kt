@@ -30,6 +30,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ArrowBack
 import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.Bedtime
 import androidx.compose.material.icons.outlined.Audiotrack
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.outlined.FastForward
@@ -68,7 +69,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
@@ -226,6 +229,8 @@ fun PlayerBottomBar(
     onOpenSpeedMenu: () -> Unit,
     onToggleLock: () -> Unit,
     onEnterPip: () -> Unit,
+    onOpenSleepTimer: () -> Unit,
+    sleepTimerActive: Boolean,
     onToggleRotation: () -> Unit,
     onCycleAspectRatio: () -> Unit,
     onToggleMute: () -> Unit,
@@ -294,6 +299,12 @@ fun PlayerBottomBar(
                 activeTint,
                 onClick = onToggleLock
             )
+            BarIconButton(
+                Icons.Outlined.Bedtime,
+                "Sleep timer",
+                if (sleepTimerActive) accentColor else activeTint,
+                onClick = onOpenSleepTimer
+            )
         }
         val toolsEnd: @Composable () -> Unit = {
             BarIconButton(Icons.Outlined.PictureInPictureAlt, "Picture in picture", activeTint, onClick = onEnterPip)
@@ -344,6 +355,7 @@ fun PlayerBottomBar(
 
 @Composable
 private fun PlayPauseButton(isPlaying: Boolean, accentColor: Color, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
     Box(
         modifier = Modifier
             .padding(horizontal = 6.dp)
@@ -352,7 +364,10 @@ private fun PlayPauseButton(isPlaying: Boolean, accentColor: Color, onClick: () 
             .size(52.dp),
         contentAlignment = Alignment.Center
     ) {
-        IconButton(onClick = onClick) {
+        IconButton(onClick = {
+            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+            onClick()
+        }) {
             androidx.compose.animation.Crossfade(
                 targetState = isPlaying,
                 animationSpec = tween(150),
@@ -441,6 +456,7 @@ private fun Scrubber(
     )
     val thumbSize by animateDpAsState(if (isDragging) 18.dp else 12.dp, tween(120), label = "scrubberThumb")
     val thumbPx = with(LocalDensity.current) { thumbSize.toPx() }
+    val haptics = LocalHapticFeedback.current
 
     var trackWidthPx by remember { mutableFloatStateOf(1f) }
     val durationNow by rememberUpdatedState(durationMs)
@@ -465,6 +481,7 @@ private fun Scrubber(
                 detectHorizontalDragGestures(
                     onDragStart = { offset ->
                         isDragging = true
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         if (durationNow > 0) {
                             lastTargetMs = ((offset.x / size.width.coerceAtLeast(1)).coerceIn(0f, 1f) * durationNow).toLong()
                             previewNow(lastTargetMs)
