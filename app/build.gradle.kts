@@ -1,24 +1,8 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     // No org.jetbrains.kotlin.android here: Kotlin support is built into AGP 9.
     id("org.jetbrains.kotlin.plugin.compose")
 }
-
-// Release signing values come from environment variables (GitHub Actions) or from
-// app/keystore.properties (gitignored, for building on your own computer):
-//   storeFile=/absolute/path/to/pteron-release.jks
-//   storePassword=...
-//   keyAlias=...
-//   keyPassword=...
-val keystoreProps = Properties().apply {
-    val propsFile = rootProject.file("app/keystore.properties")
-    if (propsFile.exists()) propsFile.inputStream().use { load(it) }
-}
-
-fun signingValue(env: String, key: String): String? =
-    System.getenv(env)?.takeIf { it.isNotBlank() } ?: keystoreProps.getProperty(key)
 
 android {
     namespace = "com.pteron.player"
@@ -38,24 +22,24 @@ android {
         localeFilters += "en"
     }
 
-    // The dependency list that Gradle normally embeds (encrypted) in every APK is only useful for
-    // Google Play's own tooling; leaving it out makes the APK a little smaller.
-    dependenciesInfo {
-        includeInApk = false
-        includeInBundle = false
-    }
-
     signingConfigs {
-        // Only created when a keystore is available, so a plain `assembleDebug` still works anywhere.
-        val storePath = signingValue("KEYSTORE_PATH", "storeFile")
-        if (storePath != null) {
-            create("release") {
-                storeFile = file(storePath)
-                storePassword = signingValue("KEYSTORE_PASSWORD", "storePassword")
-                keyAlias = signingValue("KEY_ALIAS", "keyAlias")
-                keyPassword = signingValue("KEY_PASSWORD", "keyPassword")
-            }
-        }
+        // Release signing is intentionally NOT hardcoded here.
+        // Create app/keystore.properties (gitignored) with:
+        //   storeFile=/absolute/path/to/pteron-release.jks
+        //   storePassword=...
+        //   keyAlias=...
+        //   keyPassword=...
+        // and uncomment the block below before building a release AAB.
+        //
+        // create("release") {
+        //     val props = java.util.Properties()
+        //     val propsFile = rootProject.file("app/keystore.properties")
+        //     if (propsFile.exists()) props.load(propsFile.inputStream())
+        //     storeFile = props["storeFile"]?.let { file(it) }
+        //     storePassword = props["storePassword"] as String?
+        //     keyAlias = props["keyAlias"] as String?
+        //     keyPassword = props["keyPassword"] as String?
+        // }
     }
 
     buildTypes {
@@ -70,15 +54,16 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            // Signed with your own key when one is configured (this is the APK to install and share).
-            signingConfig = signingConfigs.findByName("release")
+            // signingConfig = signingConfigs.getByName("release")
         }
-        // Mirrors `release` (minified + shrunk, so the size is realistic). Signed with the release
-        // key when available, otherwise with the debug key so it still installs for size checks.
+        // Mirrors `release` (minified + shrunk, so the size is realistic) but signed
+        // with the debug key so it installs on a device without a production
+        // keystore. Use this build type to actually measure/verify APK size --
+        // `assembleDebug` is never representative, since it isn't minified at all.
         create("benchmark") {
             initWith(getByName("release"))
             matchingFallbacks += listOf("release")
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("debug")
             applicationIdSuffix = ".benchmark"
             isDebuggable = false
         }
@@ -144,6 +129,12 @@ dependencies {
     // Powers system media-notification controls, lock-screen playback controls, and
     // headphone/Bluetooth media-button routing (see playback/PlaybackSessionService).
     implementation("androidx.media3:media3-session:1.10.1")
+    // Software audio decoder (DTS, AC3, E-AC3, TrueHD, ALAC...) for the many MKV files whose sound
+    // the phone's own decoders cannot play. Picked up automatically by DefaultRenderersFactory
+    // (extension mode PREFER). Community build of Media3's FFmpeg extension; adds a few MB per CPU
+    // type -- the release AAB only ships the one matching each phone.
+    // If this exact version is not found, use the newest "<major>.<minor>.<patch>+1" on Maven Central.
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:1.9.0+1")
 
     // Preferences / persistence
     implementation("androidx.datastore:datastore-preferences:1.2.0")
@@ -151,6 +142,10 @@ dependencies {
 
     // Thumbnail loading & caching
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // Installs the baseline profile (src/main/baseline-prof.txt) so the app starts and scrolls
+    // smoothly from the very first launch.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
