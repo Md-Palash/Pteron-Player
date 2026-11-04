@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.prefs.AppFont
+import com.pteron.player.data.prefs.AudioMode
 import com.pteron.player.data.prefs.AppTheme
 import com.pteron.player.data.prefs.AppearancePrefsRepository
 import com.pteron.player.data.prefs.AppearanceState
@@ -16,6 +17,7 @@ import com.pteron.player.data.prefs.OrientationLock
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
 import com.pteron.player.data.prefs.PlaybackStateRepository
+import com.pteron.player.data.prefs.SubtitleStyle
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
@@ -76,10 +78,13 @@ class SettingsViewModel(
     fun setKeepScreenOnWhilePlaying(value: Boolean) = viewModelScope.launch { playbackPrefsRepository.setKeepScreenOnWhilePlaying(value) }
     fun setOrientationLock(lock: OrientationLock) = viewModelScope.launch { playbackPrefsRepository.setOrientationLock(lock) }
     fun setDefaultAspectRatio(mode: AspectRatioMode) = viewModelScope.launch { playbackPrefsRepository.setDefaultAspectRatio(mode) }
+    fun setVideoAudioMode(mode: AudioMode) = viewModelScope.launch { playbackPrefsRepository.setAudioMode(mode) }
+    fun setSubtitleStyle(style: SubtitleStyle) = viewModelScope.launch { playbackPrefsRepository.setSubtitleStyle(style) }
     fun setControlAutoHideSeconds(seconds: Int) = viewModelScope.launch { playbackPrefsRepository.setControlAutoHideSeconds(seconds) }
 
     // --- Music player -------------------------------------------------------------
 
+    fun setMusicAudioMode(mode: AudioMode) = viewModelScope.launch { musicPrefsRepository.setAudioMode(mode) }
     fun setSkipSilence(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setSkipSilence(value) }
     fun setLoudnessBoostEnabled(value: Boolean) = viewModelScope.launch { musicPrefsRepository.setLoudnessBoostEnabled(value) }
     fun setLoudnessBoostLevel(value: Float) = viewModelScope.launch { musicPrefsRepository.setLoudnessBoostLevel(value) }
