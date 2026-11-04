@@ -90,7 +90,7 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
  * these are short and the incoming screen waits a beat so the two never muddy each other.
  */
-private const val NavMs = 280
+private const val NavMs = 240
 private val navEase = FastOutSlowInEasing
 
 private fun tabIndex(route: String?): Int = BottomNavDestination.entries.indexOfFirst { it.screen.route == route }
@@ -114,7 +114,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): Ent
         return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
     }
     return slideInHorizontally(tween(NavMs, easing = navEase)) { dir * it / 5 } +
-        fadeIn(tween(210, easing = navEase)) +
+        fadeIn(tween(180, easing = navEase)) +
         scaleIn(tween(NavMs, easing = navEase), initialScale = 0.97f)
 }
 
@@ -152,13 +152,13 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopExitFor(): E
 
 // The video surface cannot slide, scale or fade with the rest of the screen, so the player only
 // fades in and out (short) instead of moving.
-private val playerEnter = fadeIn(tween(220, easing = navEase))
+private val playerEnter = fadeIn(tween(190, easing = navEase))
 private val playerPopExit = fadeOut(tween(120))
 
 // Pushed pages (Folder, playlists, artist): the page slides in from the right while fading up and
 // settling from slightly smaller; the page underneath drifts left a little (parallax).
 private val pushEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
-    fadeIn(tween(210, easing = navEase)) +
+    fadeIn(tween(180, easing = navEase)) +
     scaleIn(tween(NavMs, easing = navEase), initialScale = 0.96f)
 private val pushExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 
@@ -166,7 +166,7 @@ private val pushExit = slideOutHorizontally(animationSpec = tween(NavMs, easing 
 // shrinks a little, and the page underneath drifts back in from the left.
 private val popEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 private val popExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
-    fadeOut(tween(200, easing = navEase)) +
+    fadeOut(tween(170, easing = navEase)) +
     scaleOut(tween(NavMs, easing = navEase), targetScale = 0.96f)
 
 @UnstableApi
@@ -311,10 +311,10 @@ fun PteronNavGraph(
             route = Screen.NowPlaying.route,
             // The big card rises from the bottom (like opening the mini card) and drops back down;
             // it is opaque the whole time, so no light window background shows through.
-            enterTransition = { slideInVertically(tween(380, easing = FastOutSlowInEasing)) { it } },
+            enterTransition = { slideInVertically(tween(340, easing = FastOutSlowInEasing)) { it } },
             exitTransition = { ExitTransition.None },
             popEnterTransition = { EnterTransition.None },
-            popExitTransition = { slideOutVertically(tween(320, easing = FastOutSlowInEasing)) { it } }
+            popExitTransition = { slideOutVertically(tween(290, easing = FastOutSlowInEasing)) { it } }
         ) {
             NowPlayingScreen(
                 controller = app.audioController,
