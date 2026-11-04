@@ -377,7 +377,6 @@ class AudioPlayerController(
             prefs.bassBoostLevel <= 0f && prefs.virtualizerLevel <= 0f
         if (wanted == offloadOn) return
         offloadOn = wanted
-        player.experimentalSetOffloadSchedulingEnabled(wanted)
         player.trackSelectionParameters = player.trackSelectionParameters.buildUpon()
             .setAudioOffloadPreferences(
                 TrackSelectionParameters.AudioOffloadPreferences.Builder()
