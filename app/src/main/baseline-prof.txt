@@ -1,0 +1,12 @@
+# Baseline profile: tells Android which code to pre-compile at install time, so the first launch
+# and the first scrolls are smooth instead of running through the slow interpreter.
+# (Compose and Media3 ship their own profiles; these rules cover the app itself.)
+# Flags: H = hot, S = startup, P = post-startup.
+HSPLcom/pteron/player/**;->**(**)**
+Lcom/pteron/player/**;
+HSPLandroidx/media3/exoplayer/ExoPlayerImpl;->**(**)**
+HSPLandroidx/media3/exoplayer/ExoPlayerImplInternal;->**(**)**
+HSPLandroidx/media3/session/MediaSession**;->**(**)**
+HSPLcoil/**;->**(**)**
+HSPLandroidx/datastore/**;->**(**)**
+HSPLandroidx/navigation/**;->**(**)**
