@@ -42,8 +42,8 @@ data class PlaybackPrefsState(
     /** Keep audio playing (video decode off) when the app is minimized, the screen locks, or a
      *  floating Picture-in-Picture window is closed -- like a music player, instead of pausing. */
     val backgroundPlaybackEnabled: Boolean = false,
-    /** Equalizer preset applied to the video player's sound. */
-    val audioMode: AudioMode = AudioMode.DEFAULT,
+    /** Dialogue boost: lifts the speech range so voices are easier to understand. */
+    val clearVoice: Boolean = false,
     val subtitleStyle: SubtitleStyle = SubtitleStyle.CLASSIC
 )
 
@@ -66,7 +66,7 @@ class PlaybackPrefsRepository(private val context: Context) {
         val DEFAULT_ASPECT_RATIO = stringPreferencesKey("default_aspect_ratio")
         val CONTROL_AUTO_HIDE_SECONDS = intPreferencesKey("control_auto_hide_seconds")
         val BACKGROUND_PLAYBACK = booleanPreferencesKey("background_playback_enabled")
-        val AUDIO_MODE = stringPreferencesKey("audio_mode")
+        val CLEAR_VOICE = booleanPreferencesKey("clear_voice")
         val SUBTITLE_STYLE = stringPreferencesKey("subtitle_style")
     }
 
@@ -87,7 +87,7 @@ class PlaybackPrefsRepository(private val context: Context) {
             }.getOrDefault(AspectRatioMode.FILL),
             controlAutoHideSeconds = prefs[Keys.CONTROL_AUTO_HIDE_SECONDS] ?: 4,
             backgroundPlaybackEnabled = prefs[Keys.BACKGROUND_PLAYBACK] ?: false,
-            audioMode = AudioMode.fromName(prefs[Keys.AUDIO_MODE]),
+            clearVoice = prefs[Keys.CLEAR_VOICE] ?: false,
             subtitleStyle = runCatching {
                 SubtitleStyle.valueOf(prefs[Keys.SUBTITLE_STYLE] ?: SubtitleStyle.CLASSIC.name)
             }.getOrDefault(SubtitleStyle.CLASSIC)
@@ -106,7 +106,7 @@ class PlaybackPrefsRepository(private val context: Context) {
     suspend fun setControlAutoHideSeconds(seconds: Int) = edit { it[Keys.CONTROL_AUTO_HIDE_SECONDS] = seconds.coerceIn(1, 15) }
     suspend fun setBackgroundPlaybackEnabled(value: Boolean) = edit { it[Keys.BACKGROUND_PLAYBACK] = value }
 
-    suspend fun setAudioMode(mode: AudioMode) = edit { it[Keys.AUDIO_MODE] = mode.name }
+    suspend fun setClearVoice(value: Boolean) = edit { it[Keys.CLEAR_VOICE] = value }
     suspend fun setSubtitleStyle(style: SubtitleStyle) = edit { it[Keys.SUBTITLE_STYLE] = style.name }
 
     private suspend fun edit(block: (androidx.datastore.preferences.core.MutablePreferences) -> Unit) {
