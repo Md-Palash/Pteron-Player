@@ -36,6 +36,8 @@ data class VideoItem(
     val mimeType: String,
     /** The folder's display name as MediaStore reports it (empty if unknown). */
     val bucketName: String = "",
+    /** Folder path inside shared storage (Android 10+), e.g. "Movies/Trips/". Used to move videos. */
+    val relativePath: String = "",
     // Populated lazily/best-effort; null means "unknown", never guessed.
     val hasEmbeddedSubtitleTrack: Boolean? = null,
     // Persisted, user/device-derived state (not part of the MediaStore row).
