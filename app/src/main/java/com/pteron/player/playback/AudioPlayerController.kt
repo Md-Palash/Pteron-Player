@@ -58,7 +58,9 @@ data class AudioPlayerState(
     val shuffle: Boolean = false,
     val repeat: RepeatMode = RepeatMode.OFF,
     val hasNext: Boolean = false,
-    val hasPrevious: Boolean = false
+    val hasPrevious: Boolean = false,
+    /** The play button's state: follows what the person asked for, so it never flickers while buffering. */
+    val wantsPlay: Boolean = false
 )
 
 /**
@@ -201,7 +203,7 @@ class AudioPlayerController(
                 .collectLatest { active ->
                     _positionMs.value = player.currentPosition.coerceAtLeast(0L)
                     while (active) {
-                        delay(500)
+                        delay(1_000)
                         _positionMs.value = player.currentPosition.coerceAtLeast(0L)
                     }
                 }
@@ -345,7 +347,8 @@ class AudioPlayerController(
                 else -> RepeatMode.OFF
             },
             hasNext = player.hasNextMediaItem(),
-            hasPrevious = player.hasPreviousMediaItem()
+            hasPrevious = player.hasPreviousMediaItem(),
+            wantsPlay = player.playWhenReady && player.playbackState != Player.STATE_ENDED
         )
         if (!player.isPlaying) _positionMs.value = player.currentPosition.coerceAtLeast(0L)
     }
