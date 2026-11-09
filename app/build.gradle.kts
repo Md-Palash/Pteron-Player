@@ -14,6 +14,19 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+
+        // The FFmpeg decoder ships a native library per CPU type. Phones are ARM; the x86 builds are
+        // only for emulators and would roughly double the native size of a single APK.
+        // For the smallest APK keep only "arm64-v8a" (drops very old 32-bit-only phones).
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
+    }
+
+    // Do not embed the dependency list in the APK / bundle (saves a little size, nothing needs it).
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 
     // The app only ships English strings, so keep the translations bundled inside
@@ -79,11 +92,17 @@ android {
     }
 
     packaging {
+        // Native libraries stay uncompressed inside the APK and are mapped straight from it:
+        // smaller on disk after install and faster to start.
+        jniLibs {
+            useLegacyPackaging = false
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             // Debug/tooling metadata that is never read at runtime.
             excludes += "/DebugProbesKt.bin"
             excludes += "/kotlin-tooling-metadata.json"
+            excludes += "/META-INF/*.version"
         }
     }
 }
@@ -115,7 +134,6 @@ dependencies {
 
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
-    implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     // The icon libraries stopped shipping with the rest of Compose after 1.7, so this one is
     // pinned to its final version instead of following the BOM.
@@ -152,5 +170,6 @@ dependencies {
     androidTestImplementation("androidx.test.espresso:espresso-core:3.7.0")
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
     debugImplementation("androidx.compose.ui:ui-tooling")
+    debugImplementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
 }

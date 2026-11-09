@@ -7,3 +7,7 @@
 # The FFmpeg audio decoder is created by name (reflection) by DefaultRenderersFactory.
 -keep class androidx.media3.decoder.ffmpeg.** { *; }
 -dontwarn androidx.media3.decoder.ffmpeg.**
+
+# Smaller, faster release code: merge everything into one package and let R8 widen access.
+-repackageclasses ''
+-allowaccessmodification
