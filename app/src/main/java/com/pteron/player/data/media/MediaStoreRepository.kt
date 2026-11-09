@@ -3,6 +3,7 @@ package com.pteron.player.data.media
 import android.content.ContentUris
 import android.content.Context
 import android.database.ContentObserver
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
@@ -24,7 +25,8 @@ import kotlinx.coroutines.withContext
  */
 class MediaStoreRepository(private val context: Context) {
 
-    private val projection = arrayOf(
+    private val projection: Array<String> = buildList {
+        addAll(listOf(
         MediaStore.Video.Media._ID,
         MediaStore.Video.Media.DISPLAY_NAME,
         MediaStore.Video.Media.BUCKET_ID,
@@ -34,8 +36,9 @@ class MediaStoreRepository(private val context: Context) {
         MediaStore.Video.Media.DATE_ADDED,
         MediaStore.Video.Media.WIDTH,
         MediaStore.Video.Media.HEIGHT,
-        MediaStore.Video.Media.MIME_TYPE
-    )
+        MediaStore.Video.Media.MIME_TYPE))
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(MediaStore.Video.Media.RELATIVE_PATH)
+    }.toTypedArray()
 
     /** Loads every video visible to the app, across all folders. */
     suspend fun loadAllVideos(): List<VideoItem> = queryVideos(selection = null, selectionArgs = null)
@@ -87,6 +90,7 @@ class MediaStoreRepository(private val context: Context) {
                 val widthCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.WIDTH)
                 val heightCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.HEIGHT)
                 val mimeCol = cursor.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
+                val pathCol = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) cursor.getColumnIndex(MediaStore.Video.Media.RELATIVE_PATH) else -1
 
                 while (cursor.moveToNext()) {
                     val id = cursor.getLong(idCol)
@@ -97,6 +101,7 @@ class MediaStoreRepository(private val context: Context) {
                         displayName = cursor.getString(nameCol) ?: "Untitled",
                         bucketId = cursor.getString(bucketIdCol) ?: "unknown",
                         bucketName = cursor.getString(bucketNameCol).orEmpty(),
+                        relativePath = if (pathCol >= 0) cursor.getString(pathCol).orEmpty() else "",
                         durationMs = cursor.getLong(durationCol),
                         sizeBytes = cursor.getLong(sizeCol),
                         dateAddedSeconds = cursor.getLong(dateCol),
