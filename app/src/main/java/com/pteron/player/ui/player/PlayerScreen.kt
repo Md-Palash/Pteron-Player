@@ -79,8 +79,8 @@ import com.pteron.player.ui.player.components.PlayerBottomBar
 import com.pteron.player.ui.player.components.PlayerTopBar
 import com.pteron.player.ui.player.components.SeekFlashIndicator
 import com.pteron.player.ui.player.components.SeekFlashSide
-import com.pteron.player.ui.player.components.SpeedSelectorSheet
-import com.pteron.player.ui.player.components.TrackSelectorSheet
+import com.pteron.player.ui.player.components.SpeedPopup
+import com.pteron.player.ui.player.components.TrackPopup
 import com.pteron.player.ui.player.components.VolumeHud
 import com.pteron.player.util.PipController
 import com.pteron.player.util.formatTimecode
@@ -337,6 +337,9 @@ fun PlayerScreen(
     val subtitleTextSize by remember { derivedStateOf { uiState.playbackPrefs.subtitleTextSizeSp } }
     val subtitleStyle by remember { derivedStateOf { uiState.playbackPrefs.subtitleStyle } }
 
+    // With the controls hidden nothing reads the position, so the player stops publishing it.
+    LaunchedEffect(controlsVisible) { viewModel.setControlsVisible(controlsVisible) }
+
     // The play / pause button inside the Picture-in-Picture window.
     DisposableEffect(viewModel) {
         PipController.togglePlayPause = viewModel::playPause
@@ -432,7 +435,7 @@ fun PlayerScreen(
                 sensitivity = uiState.appearance.gestureSensitivity,
                 durationMs = uiState.durationMs,
                 // Read once when a scrub begins -- no per-second recomposition of the overlay.
-                positionProvider = { viewModel.progress.value.positionMs },
+                positionProvider = { viewModel.currentPositionMs() },
                 onToggleControls = { controlsVisible = !controlsVisible },
                 onTogglePlayPause = viewModel::playPause,
                 onSeekBy = viewModel::seekBy,
@@ -587,6 +590,8 @@ fun PlayerScreen(
                     },
                     onOpenSleepTimer = { showSleepSheet = true },
                     sleepTimerActive = sleepEndsAt != null,
+                    onToggleClearVoice = viewModel::toggleClearVoice,
+                    clearVoiceActive = uiState.playbackPrefs.clearVoice,
                     onToggleRotation = {
                         activity?.let { toggleOrientation(it) }
                     },
@@ -627,6 +632,41 @@ fun PlayerScreen(
             }
         }
 
+        // Small floating cards next to the buttons that open them.
+        SpeedPopup(
+            visible = showSpeedSheet,
+            currentSpeed = uiState.playbackSpeed,
+            onSelect = {
+                viewModel.setPlaybackSpeed(it)
+                showSpeedSheet = false
+            },
+            onDismiss = { showSpeedSheet = false }
+        )
+        TrackPopup(
+            visible = showAudioSheet,
+            tracks = uiState.audioTracks,
+            allowDisable = false,
+            onSelect = { option ->
+                option?.let { viewModel.selectAudioTrack(it) }
+                showAudioSheet = false
+            },
+            onDismiss = { showAudioSheet = false }
+        )
+        TrackPopup(
+            visible = showSubtitleSheet,
+            tracks = uiState.subtitleTracks,
+            allowDisable = true,
+            onSelect = { option ->
+                viewModel.selectSubtitleTrack(option)
+                showSubtitleSheet = false
+            },
+            onDismiss = { showSubtitleSheet = false },
+            onLoadExternal = {
+                showSubtitleSheet = false
+                subtitlePickerLauncher.launch(arrayOf("*/*"))
+            }
+        )
+
         uiState.error?.let { message ->
             androidx.compose.material3.AlertDialog(
                 onDismissRequest = viewModel::clearError,
@@ -640,44 +680,6 @@ fun PlayerScreen(
     }
 
     if (showSleepSheet) SleepTimerSheet(onDismiss = { showSleepSheet = false })
-    if (showSpeedSheet) {
-        SpeedSelectorSheet(
-            currentSpeed = uiState.playbackSpeed,
-            onSelect = {
-                viewModel.setPlaybackSpeed(it)
-                showSpeedSheet = false
-            },
-            onDismiss = { showSpeedSheet = false }
-        )
-    }
-    if (showAudioSheet) {
-        TrackSelectorSheet(
-            title = "Audio track",
-            tracks = uiState.audioTracks,
-            allowDisable = false,
-            onSelect = { option ->
-                option?.let { viewModel.selectAudioTrack(it) }
-                showAudioSheet = false
-            },
-            onDismiss = { showAudioSheet = false }
-        )
-    }
-    if (showSubtitleSheet) {
-        TrackSelectorSheet(
-            title = "Subtitles",
-            tracks = uiState.subtitleTracks,
-            allowDisable = true,
-            onSelect = { option ->
-                viewModel.selectSubtitleTrack(option)
-                showSubtitleSheet = false
-            },
-            onDismiss = { showSubtitleSheet = false },
-            onLoadExternal = {
-                showSubtitleSheet = false
-                subtitlePickerLauncher.launch(arrayOf("*/*"))
-            }
-        )
-    }
 }
 
 /**

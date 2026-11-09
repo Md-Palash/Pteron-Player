@@ -29,6 +29,7 @@ import com.pteron.player.data.media.MediaStoreRepository
 import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.data.prefs.AppearancePrefsRepository
+import com.pteron.player.data.prefs.AudioMode
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.PlaybackPrefsRepository
 import com.pteron.player.data.prefs.PlaybackPrefsState
@@ -48,7 +49,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -233,6 +239,7 @@ class PlayerViewModel(
     init {
         PlaybackSessionHolder.session = mediaSession
         SleepTimer.addListener(sleepTimerListener)
+        observeFavorite()
         runCatching { application.startService(Intent(application, PlaybackSessionService::class.java)) }
 
         viewModelScope.launch {
@@ -252,7 +259,7 @@ class PlayerViewModel(
                     aspectRatioMode = if (startingUp) prefs.defaultAspectRatio else _uiState.value.aspectRatioMode
                 )
                 applyAudioBoost(prefs.audioBoostEnabled, prefs.audioBoostLevel)
-                audioModeEffect.apply(audioSessionId, prefs.audioMode)
+                audioModeEffect.apply(audioSessionId, soundMode(prefs.clearVoice))
                 // Read synchronously by MainActivity.onUserLeaveHint(), a plain (non-suspend)
                 // Activity callback, to decide whether to skip auto-PiP in favor of plain
                 // background audio.
@@ -587,6 +594,50 @@ class PlayerViewModel(
         }
     }
 
+    private fun soundMode(clearVoice: Boolean) = if (clearVoice) AudioMode.CLEAR_VOICE else AudioMode.NORMAL
+
+    fun toggleClearVoice() {
+        viewModelScope.launch { playbackPrefsRepository.setClearVoice(!_uiState.value.playbackPrefs.clearVoice) }
+    }
+
+    /**
+     * The video loaded from MediaStore knows nothing about favorites, so the flag is kept in sync
+     * with the saved state here -- otherwise the heart in the player never changes.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun observeFavorite() {
+        viewModelScope.launch {
+            _uiState.map { it.currentVideo?.id }
+                .distinctUntilChanged()
+                .flatMapLatest { id ->
+                    if (id == null || id == EXTERNAL_VIDEO_ID) emptyFlow<Pair<Long, Boolean>>()
+                    else playbackStateRepository.observeState(id).map { id to it.isFavorite }
+                }
+                .distinctUntilChanged()
+                .collect { (id, favorite) ->
+                    val state = _uiState.value
+                    val video = state.currentVideo ?: return@collect
+                    if (video.id == id && video.isFavorite != favorite) {
+                        _uiState.value = state.copy(currentVideo = video.copy(isFavorite = favorite))
+                    }
+                }
+        }
+    }
+
+    /** True while the seek bar / time labels are on screen; otherwise the once-a-second tick is skipped (battery). */
+    @Volatile
+    private var progressObserved = true
+
+    fun setControlsVisible(visible: Boolean) {
+        if (progressObserved == visible) return
+        progressObserved = visible
+        if (visible) publishProgress()
+        if (player.isPlaying) startPositionTicker(resetSave = false)
+    }
+
+    /** The live position, read straight from the player (used when a scrub starts). */
+    fun currentPositionMs(): Long = player.currentPosition.coerceAtLeast(0L)
+
     fun playPause() {
         // After the last video ends, "play" must start it over; a plain toggle of playWhenReady
         // does nothing in the ENDED state, which left the button looking dead.
@@ -900,7 +951,7 @@ class PlayerViewModel(
         audioModeEffect.release()
         val prefs = _uiState.value.playbackPrefs
         applyAudioBoost(prefs.audioBoostEnabled, prefs.audioBoostLevel)
-        audioModeEffect.apply(newAudioSessionId, prefs.audioMode)
+        audioModeEffect.apply(newAudioSessionId, soundMode(prefs.clearVoice))
     }
 
     private fun applyAudioBoost(enabled: Boolean, level: Float) {
@@ -936,17 +987,17 @@ class PlayerViewModel(
         }
     }
 
-    private fun startPositionTicker() {
+    private fun startPositionTicker(resetSave: Boolean = true) {
         stopPositionTicker()
-        lastSavedAtMs = SystemClock.elapsedRealtime()
+        if (resetSave) lastSavedAtMs = SystemClock.elapsedRealtime()
         positionTickerJob = viewModelScope.launch {
             while (true) {
-                val visible = uiActive
-                if (visible) publishProgress()
+                val watching = uiActive && progressObserved
+                if (watching) publishProgress()
                 saveProgress(force = false)
-                // Nothing to redraw while minimized, so wake up far less often (the periodic
-                // save is just a safety net in case the process is killed).
-                delay(if (visible) 1_000L else 5_000L)
+                // Nothing to redraw while minimized or with the controls hidden, so wake up far less
+                // often (the periodic save is just a safety net in case the process is killed).
+                delay(if (watching) 1_000L else 5_000L)
             }
         }
     }
