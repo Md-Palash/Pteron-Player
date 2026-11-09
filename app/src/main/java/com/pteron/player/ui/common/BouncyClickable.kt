@@ -33,6 +33,8 @@ fun Modifier.bouncyClickable(
     enabled: Boolean = true,
     pressedScale: Float = 0.96f,
     haptic: Boolean = true,
+    /** False for big controls whose icon changes on tap: the press settles without a wobble. */
+    bouncy: Boolean = true,
     onLongClick: (() -> Unit)? = null,
     onClick: () -> Unit
 ): Modifier {
@@ -41,7 +43,10 @@ fun Modifier.bouncyClickable(
     val haptics = LocalHapticFeedback.current
     val scale = androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (isPressed) pressedScale else 1f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(
+            dampingRatio = if (bouncy) Spring.DampingRatioMediumBouncy else Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMedium
+        ),
         label = "bouncyClickableScale"
     )
     return this

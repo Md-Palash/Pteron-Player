@@ -18,6 +18,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,8 +41,12 @@ fun SearchCard(
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    /** Opens the keyboard as soon as the field appears. */
+    autoFocus: Boolean = false
 ) {
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(Unit) { if (autoFocus) focusRequester.requestFocus() }
     val shape = RoundedCornerShape(percent = 50)
     val focusManager = LocalFocusManager.current
     var focused by remember { mutableStateOf(false) }
@@ -58,6 +65,7 @@ fun SearchCard(
             .fillMaxWidth(0.78f)
             .widthIn(max = 360.dp)
             .border(if (focused) 1.5.dp else 1.dp, borderColor, shape)
+            .focusRequester(focusRequester)
             .onFocusChanged { focused = it.isFocused },
         placeholder = { Text(placeholder) },
         leadingIcon = { Icon(Icons.Outlined.Search, contentDescription = null) },

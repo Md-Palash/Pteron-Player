@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 fun PteronClickableCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    onLongClick: (() -> Unit)? = null,
     shape: Shape = RoundedCornerShape(16.dp),
     color: Color = MaterialTheme.colorScheme.surfaceContainer,
     borderColor: Color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
@@ -35,7 +36,7 @@ fun PteronClickableCard(
         modifier = modifier
             .clip(shape)
             .semantics { role = Role.Button }
-            .bouncyClickable(onClick = onClick)
+            .bouncyClickable(onLongClick = onLongClick, onClick = onClick)
             .background(color, shape)
             .border(1.dp, borderColor, shape),
         content = content

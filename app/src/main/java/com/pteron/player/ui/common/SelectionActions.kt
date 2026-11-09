@@ -15,7 +15,29 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import android.content.ContentValues
+import android.widget.Toast
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.SelectAll
@@ -33,33 +55,62 @@ import com.pteron.player.data.model.VideoItem
 /** Adds [id] to the set, or removes it when it is already inside. */
 fun Set<Long>.toggled(id: Long): Set<Long> = if (id in this) this - id else this + id
 
-/** Replaces a screen's header while videos are selected: close, count, and the batch actions. */
+/**
+ * Replaces a screen's header while videos are selected. The tick on the right selects everything
+ * when it is off and clears the selection (leaving selection mode) when it is on.
+ */
 @Composable
 fun SelectionBar(
     count: Int,
+    allSelected: Boolean,
     onClose: () -> Unit,
     onSelectAll: () -> Unit,
     onAddToPlaylist: () -> Unit,
+    onMove: (() -> Unit)?,
     onShare: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val size = 36.dp
+    val size = 42.dp
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            CircularActionButton(Icons.Outlined.Close, "Cancel selection", onClose, size = size)
-            TwoLineTitle(subtitle = "SELECTED", title = "$count video${if (count == 1) "" else "s"}")
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            CircularActionButton(Icons.Outlined.SelectAll, "Select all", onSelectAll, size = size)
+        TwoLineTitle(subtitle = "SELECTED", title = "$count")
+        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+            SelectAllTick(allSelected, size) { if (allSelected) onClose() else onSelectAll() }
             CircularActionButton(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist, size = size)
+            if (onMove != null) CircularActionButton(Icons.Outlined.FolderOpen, "Move to folder", onMove, size = size)
             CircularActionButton(Icons.Outlined.Share, "Share", onShare, size = size)
             if (onDelete != null) CircularActionButton(Icons.Outlined.DeleteOutline, "Delete", onDelete, size = size)
         }
+    }
+}
+
+/** A tick in a circle: filled while everything is selected, an empty ring otherwise. */
+@Composable
+private fun SelectAllTick(checked: Boolean, size: Dp, onClick: () -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Box(
+        modifier = Modifier
+            .size(size)
+            .clip(CircleShape)
+            .semantics {
+                role = Role.Checkbox
+                contentDescription = if (checked) "Clear selection" else "Select all"
+            }
+            .bouncyClickable(onClick = onClick)
+            .background(if (checked) scheme.primary else scheme.surfaceContainer)
+            .border(1.5.dp, if (checked) scheme.primary else scheme.outline, CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Filled.Check,
+            contentDescription = null,
+            tint = if (checked) scheme.onPrimary else scheme.onSurfaceVariant,
+            modifier = Modifier.size(size * 0.5f)
+        )
     }
 }
 
@@ -103,6 +154,52 @@ fun rememberDeleteVideos(onDeleted: () -> Unit): ((List<VideoItem>) -> Unit)? {
                         context.contentResolver,
                         videos.map { Uri.parse(it.contentUri) }
                     )
+                    launcher.launch(IntentSenderRequest.Builder(request.intentSender).build())
+                }
+            }
+            Unit
+        }
+    }
+}
+
+/**
+ * Returns a function that moves videos into the folder at [relativePath] (e.g. "Movies/Trips/",
+ * created on the fly when it does not exist yet). Android asks once for permission to change the
+ * files; this needs Android 11+, so below that it returns null.
+ */
+@Composable
+fun rememberMoveVideos(onMoved: () -> Unit): ((List<VideoItem>, String) -> Unit)? {
+    val context = LocalContext.current
+    val onMovedNow by rememberUpdatedState(onMoved)
+    val scope = rememberCoroutineScope()
+    var pending by remember { mutableStateOf<Pair<List<VideoItem>, String>?>(null) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        val job = pending
+        pending = null
+        if (result.resultCode == Activity.RESULT_OK && job != null) {
+            scope.launch {
+                val moved = withContext(Dispatchers.IO) {
+                    val values = ContentValues().apply { put(MediaStore.MediaColumns.RELATIVE_PATH, job.second) }
+                    job.first.count { video ->
+                        runCatching { context.contentResolver.update(Uri.parse(video.contentUri), values, null, null) }
+                            .getOrDefault(0) > 0
+                    }
+                }
+                Toast.makeText(context, "Moved $moved video${if (moved == 1) "" else "s"}", Toast.LENGTH_SHORT).show()
+                onMovedNow()
+            }
+        }
+    }
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
+    return remember(context, launcher) {
+        { videos: List<VideoItem>, destination: String ->
+            if (videos.isNotEmpty()) {
+                runCatching {
+                    val request = MediaStore.createWriteRequest(
+                        context.contentResolver,
+                        videos.map { Uri.parse(it.contentUri) }
+                    )
+                    pending = videos to destination
                     launcher.launch(IntentSenderRequest.Builder(request.intentSender).build())
                 }
             }
