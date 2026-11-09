@@ -140,6 +140,9 @@ class LibraryViewModel(
             .take(10)
     }
 
+    /** Every video of one folder, used to delete the whole folder. */
+    suspend fun videosInFolder(bucketId: String): List<VideoItem> = mediaStoreRepository.loadVideosInBucket(bucketId)
+
     fun onSearchQueryChange(query: String) = local.update { it.copy(searchQuery = query) }
 
     fun toggleDarkMode() {

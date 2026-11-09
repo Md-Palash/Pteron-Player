@@ -28,7 +28,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.ViewList
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import com.pteron.player.data.model.VideoFolder
+import com.pteron.player.ui.common.rememberDeleteVideos
+import kotlinx.coroutines.launch
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -96,6 +103,24 @@ fun LibraryScreen(
         }
     }
 
+    val scope = rememberCoroutineScope()
+    var folderToDelete by remember { mutableStateOf<VideoFolder?>(null) }
+    val requestDelete = rememberDeleteVideos(onDeleted = { viewModel.refresh() })
+    folderToDelete?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderToDelete = null },
+            title = { Text("Delete folder?") },
+            text = { Text("\"${folder.name}\" and its ${folder.videoCount} video${if (folder.videoCount == 1) "" else "s"} will be deleted from your device. This can't be undone.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    folderToDelete = null
+                    scope.launch { requestDelete?.invoke(viewModel.videosInFolder(folder.bucketId)) }
+                }) { Text("Delete", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { folderToDelete = null }) { Text("Cancel") } }
+        )
+    }
+
     // rememberSaveable: survives opening a folder and coming back (a plain remember is lost
     // when the Library leaves the composition).
     var viewModeOverrideName by rememberSaveable { mutableStateOf<String?>(null) }
@@ -151,6 +176,7 @@ fun LibraryScreen(
                         onSearchQueryChange = viewModel::onSearchQueryChange,
                         onOpenFolder = onOpenFolder,
                         onOpenVideo = onOpenVideo,
+                        onFolderLongClick = requestDelete?.let { { folder: VideoFolder -> folderToDelete = folder } },
                         settled = settled
                     )
                 }
@@ -166,6 +192,7 @@ private fun LibraryContent(
     onSearchQueryChange: (String) -> Unit,
     onOpenFolder: (String, String) -> Unit,
     onOpenVideo: (Long, String) -> Unit,
+    onFolderLongClick: ((VideoFolder) -> Unit)?,
     settled: Boolean
 ) {
     val filtered = uiState.filteredFolders
@@ -218,7 +245,8 @@ private fun LibraryContent(
                         folder = folder,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
-                        onClick = { onOpenFolder(folder.bucketId, folder.name) }
+                        onClick = { onOpenFolder(folder.bucketId, folder.name) },
+                        onLongClick = onFolderLongClick?.let { { it(folder) } }
                     )
                 }
             }
@@ -232,7 +260,8 @@ private fun LibraryContent(
                         folder = folder,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
-                        onClick = { onOpenFolder(folder.bucketId, folder.name) }
+                        onClick = { onOpenFolder(folder.bucketId, folder.name) },
+                        onLongClick = onFolderLongClick?.let { { it(folder) } }
                     )
                 }
             }
