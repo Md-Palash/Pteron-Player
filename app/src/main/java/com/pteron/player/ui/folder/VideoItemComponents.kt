@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.ui.common.ThumbnailImage
 import com.pteron.player.ui.common.bouncyClickable
@@ -399,7 +400,7 @@ private fun VideoOverflowMenu(
                 modifier = Modifier.size(16.dp)
             )
         }
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        PteronMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (onAddToPlaylist != null) {
                 DropdownMenuItem(
                     text = { Text("Add to playlist") },

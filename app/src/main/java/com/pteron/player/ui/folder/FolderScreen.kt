@@ -2,6 +2,13 @@ package com.pteron.player.ui.folder
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.runtime.saveable.rememberSaveable
+import com.pteron.player.ui.common.rememberMoveVideos
+import com.pteron.player.ui.folder.MoveToFolderSheet
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
@@ -82,6 +89,19 @@ fun FolderScreen(
     var showMultiPlaylist by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val requestDelete = rememberDeleteVideos(onDeleted = { selectedIds = emptySet() })
+    val requestMove = rememberMoveVideos(onMoved = { selectedIds = emptySet() })
+    var showMoveSheet by remember { mutableStateOf(false) }
+    var searchOpen by rememberSaveable { mutableStateOf(false) }
+    if (showMoveSheet) {
+        MoveToFolderSheet(
+            videos = selectedVideos,
+            onPick = { path ->
+                showMoveSheet = false
+                requestMove?.invoke(selectedVideos, path)
+            },
+            onDismiss = { showMoveSheet = false }
+        )
+    }
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
     if (showMultiPlaylist) {
         AddVideosToPlaylistSheet(
@@ -120,9 +140,11 @@ fun FolderScreen(
             if (selectionMode) {
                 SelectionBar(
                     count = selectedIds.size,
-                    onClose = { selectedIds = emptySet() },
+                    allSelected = visibleVideos.isNotEmpty() && selectedIds.size == visibleVideos.size,
+                        onClose = { selectedIds = emptySet() },
                     onSelectAll = { selectedIds = visibleVideos.map { it.id }.toSet() },
                     onAddToPlaylist = { showMultiPlaylist = true },
+                        onMove = requestMove?.let { { showMoveSheet = true } },
                     onShare = { shareVideos(context, selectedVideos) },
                     onDelete = requestDelete?.let { delete -> { delete(selectedVideos) } }
                 )
@@ -142,6 +164,14 @@ fun FolderScreen(
                     TwoLineTitle(subtitle = "PTERON PLAYER", title = uiState.folderName)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    CircularActionButton(
+                        icon = Icons.Outlined.Search,
+                        contentDescription = "Search",
+                        onClick = {
+                            searchOpen = !searchOpen
+                            if (!searchOpen) viewModel.onSearchQueryChange("")
+                        }
+                    )
                     TopBarSortButton(
                         selectedOption = uiState.appearance.sortOption,
                         direction = uiState.appearance.sortDirection,
@@ -157,13 +187,20 @@ fun FolderScreen(
             }
 
             
-            Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
-                SearchCard(
-                    value = uiState.searchQuery,
-                    onValueChange = viewModel::onSearchQueryChange,
-                    placeholder = "Search videos..."
-                )
-            }
+            AnimatedVisibility(
+                    visible = searchOpen,
+                    enter = fadeIn(tween(140)) + expandVertically(tween(160)),
+                    exit = fadeOut(tween(100)) + shrinkVertically(tween(140))
+                ) {
+                    Box(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), contentAlignment = Alignment.Center) {
+                        SearchCard(
+                            value = uiState.searchQuery,
+                            onValueChange = viewModel::onSearchQueryChange,
+                            placeholder = "Search videos...",
+                            autoFocus = true
+                        )
+                    }
+                }
             FloatingPills(
  modifier = Modifier.fillMaxSize(),
  pills = { FilterCardsRow(active = uiState.activeFilter, onSelect = viewModel::onFilterSelected) }
