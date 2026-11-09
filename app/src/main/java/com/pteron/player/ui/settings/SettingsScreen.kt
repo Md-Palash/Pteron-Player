@@ -23,7 +23,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -94,7 +93,6 @@ import androidx.compose.ui.unit.sp
 import com.pteron.player.data.model.AspectRatioMode
 import com.pteron.player.data.prefs.AppFont
 import com.pteron.player.data.prefs.AppTheme
-import com.pteron.player.data.prefs.AudioMode
 import com.pteron.player.data.prefs.SubtitleStyle
 import com.pteron.player.data.prefs.AppearanceState
 import com.pteron.player.data.prefs.MusicPrefsState
@@ -1046,8 +1044,6 @@ private fun ScreenOptionsCard(prefs: PlaybackPrefsState, viewModel: SettingsView
 private fun AudioBoostCard(prefs: PlaybackPrefsState, viewModel: SettingsViewModel) {
     SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            AudioModeChips(prefs.audioMode, viewModel::setVideoAudioMode)
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             SettingsSwitchRow(
                 title = "Audio boost",
                 subtitle = "Amplifies quiet audio beyond 100% volume",
@@ -1103,38 +1099,11 @@ private fun SubtitleSizeCard(prefs: PlaybackPrefsState, viewModel: SettingsViewM
 
 // --- Music player -----------------------------------------------------------------------------
 
-/** The ready-made sound profiles; "Normal" turns the effect off completely. */
-@Composable
-private fun AudioModeChips(selected: AudioMode, onSelect: (AudioMode) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text("Audio mode", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "A ready-made sound profile. Normal leaves the sound untouched.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            AudioMode.entries.forEach { mode ->
-                FilterChip(
-                    selected = selected == mode,
-                    onClick = { onSelect(mode) },
-                    label = { Text(mode.displayName) }
-                )
-            }
-        }
-    }
-}
-
 @Composable
 private fun MusicSoundCard(prefs: MusicPrefsState, viewModel: SettingsViewModel) {
     val divider = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     SettingsCard {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            AudioModeChips(prefs.audioMode, viewModel::setMusicAudioMode)
-            HorizontalDivider(color = divider)
             SettingsSwitchRow(
                 title = "Skip silence",
                 subtitle = "Jumps over silent stretches inside a track",
