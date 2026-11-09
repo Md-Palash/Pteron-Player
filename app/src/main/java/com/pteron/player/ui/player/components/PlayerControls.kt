@@ -8,6 +8,12 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.material.icons.outlined.RecordVoiceOver
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -231,6 +237,8 @@ fun PlayerBottomBar(
     onEnterPip: () -> Unit,
     onOpenSleepTimer: () -> Unit,
     sleepTimerActive: Boolean,
+    onToggleClearVoice: () -> Unit,
+    clearVoiceActive: Boolean,
     onToggleRotation: () -> Unit,
     onCycleAspectRatio: () -> Unit,
     onToggleMute: () -> Unit,
@@ -248,7 +256,7 @@ fun PlayerBottomBar(
             .fillMaxWidth()
             .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
             .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + WindowInsetsSides.Bottom))
-            .padding(start = 16.dp, end = 16.dp, top = 20.dp, bottom = 8.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 18.dp)
     ) {
         Scrubber(
             currentPositionMs = currentPositionMs,
@@ -258,8 +266,9 @@ fun PlayerBottomBar(
             onPreview = onScrubPreview,
             onCommit = onScrubCommit
         )
+        // Sits right under the bar and lines up with the ends of its track.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp).offset(y = (-4).dp),
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(formatTimecode(currentPositionMs), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodyMedium)
@@ -285,19 +294,29 @@ fun PlayerBottomBar(
                 onClick = onCycleRepeat
             )
         }
-        val toolsStart: @Composable () -> Unit = {
+        // Mute only has room in the wide (landscape) layout; the volume swipe and the phone's
+        // volume keys cover it in portrait.
+        val toolsStart: @Composable (Boolean) -> Unit = { wide ->
             TextIconChip(text = speedText, icon = Icons.Outlined.Speed, onClick = onOpenSpeedMenu)
-            BarIconButton(
-                if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
-                if (isMuted) "Unmute" else "Mute",
-                activeTint,
-                onClick = onToggleMute
-            )
+            if (wide) {
+                BarIconButton(
+                    if (isMuted) Icons.Filled.VolumeOff else Icons.Filled.VolumeUp,
+                    if (isMuted) "Unmute" else "Mute",
+                    activeTint,
+                    onClick = onToggleMute
+                )
+            }
             BarIconButton(
                 if (isLocked) Icons.Outlined.Lock else Icons.Outlined.LockOpen,
                 "Lock controls",
                 activeTint,
                 onClick = onToggleLock
+            )
+            BarIconButton(
+                Icons.Outlined.RecordVoiceOver,
+                "Clear voice",
+                if (clearVoiceActive) accentColor else activeTint,
+                onClick = onToggleClearVoice
             )
             BarIconButton(
                 Icons.Outlined.Bedtime,
@@ -320,7 +339,7 @@ fun PlayerBottomBar(
                         modifier = Modifier.weight(1f),
                         horizontalArrangement = Arrangement.spacedBy(2.dp),
                         verticalAlignment = Alignment.CenterVertically
-                    ) { toolsStart() }
+                    ) { toolsStart(true) }
                     Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                         transport()
                     }
@@ -336,15 +355,15 @@ fun PlayerBottomBar(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) { transport() }
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        toolsStart()
+                        toolsStart(false)
                         toolsEnd()
                     }
                 }
@@ -353,38 +372,49 @@ fun PlayerBottomBar(
     }
 }
 
+/**
+ * The big round play / pause button. No ripple: the press is a quick, small scale-down and the
+ * icon cross-fades, so nothing flashes around the circle when it is tapped.
+ */
 @Composable
 private fun PlayPauseButton(isPlaying: Boolean, accentColor: Color, onClick: () -> Unit) {
     val haptics = LocalHapticFeedback.current
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.92f else 1f, tween(90), label = "playScale")
     Box(
         modifier = Modifier
-            .padding(horizontal = 6.dp)
+            .padding(horizontal = 4.dp)
+            .size(56.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(CircleShape)
             .background(accentColor)
-            .size(52.dp),
+            .clickable(interactionSource = source, indication = null, role = Role.Button) {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            },
         contentAlignment = Alignment.Center
     ) {
-        IconButton(onClick = {
-            haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-            onClick()
-        }) {
-            androidx.compose.animation.Crossfade(
-                targetState = isPlaying,
-                animationSpec = tween(150),
-                label = "playPauseIcon"
-            ) { playing ->
-                Icon(
-                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Pause" else "Play",
-                    // Readable on any accent: white on deep accents, dark on bright ones.
-                    tint = if (accentColor.luminance() > 0.4f) Color.Black else Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+        androidx.compose.animation.Crossfade(
+            targetState = isPlaying,
+            animationSpec = tween(120),
+            label = "playPauseIcon"
+        ) { playing ->
+            Icon(
+                imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                contentDescription = if (playing) "Pause" else "Play",
+                // Readable on any accent: white on deep accents, dark on bright ones.
+                tint = if (accentColor.luminance() > 0.4f) Color.Black else Color.White,
+                modifier = Modifier.size(30.dp)
+            )
         }
     }
 }
 
+/** A bar icon with a small press-scale instead of a ripple. */
 @Composable
 private fun BarIconButton(
     icon: ImageVector,
@@ -394,28 +424,48 @@ private fun BarIconButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = modifier.size(40.dp)) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.88f else 1f, tween(90), label = "barIconScale")
+    Box(
+        modifier = modifier
+            .size(42.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CircleShape)
+            .clickable(interactionSource = source, indication = null, enabled = enabled, role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = tint,
-            modifier = Modifier.size(22.dp)
+            modifier = Modifier.size(25.dp)
         )
     }
 }
 
 @Composable
 private fun TextIconChip(text: String, icon: ImageVector, onClick: () -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) 0.93f else 1f, tween(90), label = "chipScale")
     Row(
         modifier = Modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(RoundedCornerShape(50))
             .background(Color.White.copy(alpha = 0.15f))
-            .pointerInput(Unit) { detectTapGestures { onClick() } }
-            .padding(horizontal = 10.dp, vertical = 7.dp),
+            .clickable(interactionSource = source, indication = null, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Icon(icon, contentDescription = "Playback speed", tint = Color.White, modifier = Modifier.size(14.dp))
+        Icon(icon, contentDescription = "Playback speed", tint = Color.White, modifier = Modifier.size(15.dp))
         Text(text, color = Color.White, style = MaterialTheme.typography.titleSmall)
     }
 }
@@ -466,7 +516,8 @@ private fun Scrubber(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(36.dp)
+            .padding(horizontal = 6.dp)
+            .height(30.dp)
             .onGloballyPositioned { trackWidthPx = it.size.width.toFloat().coerceAtLeast(1f) }
             .pointerInput(Unit) {
                 detectTapGestures { offset ->
