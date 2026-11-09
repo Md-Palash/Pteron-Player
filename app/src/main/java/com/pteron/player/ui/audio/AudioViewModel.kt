@@ -8,6 +8,7 @@ import com.pteron.player.data.model.AudioArtist
 import com.pteron.player.data.model.AudioItem
 import com.pteron.player.data.model.Playlist
 import com.pteron.player.data.prefs.AppearancePrefsRepository
+import com.pteron.player.data.prefs.AudioMode
 import com.pteron.player.data.prefs.AudioStateRepository
 import com.pteron.player.data.prefs.MusicPrefsRepository
 import com.pteron.player.data.prefs.MusicPrefsState
@@ -163,6 +164,10 @@ class AudioViewModel(
 
     fun moveInPlaylist(playlistId: Long, songId: Long, delta: Int) {
         viewModelScope.launch { playlistRepository.moveVideo(playlistId, songId, delta) }
+    }
+
+    fun setAudioMode(mode: AudioMode) {
+        viewModelScope.launch { musicPrefsRepository.setAudioMode(mode) }
     }
 
     fun toggleDarkMode() {

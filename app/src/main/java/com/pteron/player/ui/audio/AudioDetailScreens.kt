@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Delete
@@ -41,6 +42,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.AudioItem
 import com.pteron.player.playback.AudioPlayerController
 import com.pteron.player.ui.common.CircularActionButton
@@ -95,22 +97,25 @@ fun AudioPlaylistScreen(
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
 
     SongsPage(
         subtitle = "PLAYLIST",
         title = playlist?.name.orEmpty(),
         songs = songs,
         emptyTitle = "This playlist is empty",
-        emptyDescription = "Open the \u22EE menu on any song and choose Add to playlist.",
+        emptyDescription = "Tap + to add songs, or open the \u22EE menu on any song and choose Add to playlist.",
         viewModel = viewModel,
         controller = controller,
         playlists = state.playlists,
         onBack = onBack,
         onOpenNowPlaying = onOpenNowPlaying,
         headerAction = {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+            CircularActionButton(Icons.Outlined.Add, "Add songs", onClick = { showPicker = true })
             Box {
                 CircularActionButton(Icons.Outlined.MoreVert, "Playlist options", onClick = { menuOpen = true })
-                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
                         text = { Text("Rename") },
                         leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
@@ -123,6 +128,7 @@ fun AudioPlaylistScreen(
                     )
                 }
             }
+            }
         },
         rowActions = { song, index ->
             buildList {
@@ -133,6 +139,14 @@ fun AudioPlaylistScreen(
         }
     )
 
+    if (showPicker) {
+        PickSongsSheet(
+            songs = state.songs,
+            existing = playlist?.videoIds.orEmpty().toSet(),
+            onAdd = { ids -> ids.forEach { viewModel.addToPlaylist(playlistId, it) } },
+            onDismiss = { showPicker = false }
+        )
+    }
     if (showRename && playlist != null) {
         PlaylistNameDialog(
             title = "Rename playlist",

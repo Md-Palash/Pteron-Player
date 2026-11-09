@@ -3,6 +3,7 @@ package com.pteron.player.ui.audio
 import com.pteron.player.ui.common.SlidingPillRow
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -377,8 +378,8 @@ fun MiniPlayer(controller: AudioPlayerController, onOpen: () -> Unit, modifier: 
                     onClick = controller::previous
                 )
                 MiniRoundButton(
-                    icon = if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    description = if (state.isPlaying) "Pause" else "Play",
+                    icon = if (state.wantsPlay) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    description = if (state.wantsPlay) "Pause" else "Play",
                     size = 56.dp,
                     container = scheme.primary,
                     tint = scheme.onPrimary,
@@ -439,15 +440,17 @@ private fun MiniRoundButton(
             .size(size)
             .clip(shape)
             .background(container)
-            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick),
+            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, bouncy = false, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = if (enabled) tint else tint.copy(alpha = 0.35f),
-            modifier = Modifier.size(size * 0.5f)
-        )
+        Crossfade(targetState = icon, animationSpec = tween(120), label = "miniIcon") { shown ->
+            Icon(
+                imageVector = shown,
+                contentDescription = description,
+                tint = if (enabled) tint else tint.copy(alpha = 0.35f),
+                modifier = Modifier.size(size * 0.5f)
+            )
+        }
     }
 }
 

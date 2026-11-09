@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.view.WindowManager
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.outlined.Bedtime
+import androidx.compose.material.icons.outlined.GraphicEq
 import androidx.compose.material.icons.outlined.FavoriteBorder
 import androidx.compose.material.icons.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Repeat
@@ -125,6 +127,7 @@ fun NowPlayingScreen(
     val activity = context as? Activity
     val menu = remember { SongMenuState() }
     var showSleep by remember { mutableStateOf(false) }
+    var showAudioMode by remember { mutableStateOf(false) }
     val themeIsDark = LocalThemeColors.current.isDark
 
     val song = state.current
@@ -179,15 +182,22 @@ fun NowPlayingScreen(
     CompositionLocalProvider(LocalNpContent provides contentColor) {
         Box(modifier = Modifier.fillMaxSize().background(tint)) {
             if (prefs.nowPlayingStyle == NowPlayingStyle.SQUARE) {
-                SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist) { showSleep = true }
+                SquareLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist, onSleepTimer = { showSleep = true }, onAudioMode = { showAudioMode = true })
             } else {
-                RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist) { showSleep = true }
+                RoundLayout(song, state, controller, tint, isFavorite, onBack, onFavorite, onShare, onAddToPlaylist, onSleepTimer = { showSleep = true }, onAudioMode = { showAudioMode = true })
             }
         }
     }
 
     SongMenuHost(menu = menu, viewModel = viewModel, controller = controller, playlists = audioState.playlists)
     if (showSleep) SleepTimerSheet(onDismiss = { showSleep = false })
+    if (showAudioMode) {
+        AudioModeSheet(
+            selected = prefs.audioMode,
+            onSelect = viewModel::setAudioMode,
+            onDismiss = { showAudioMode = false }
+        )
+    }
 }
 
 // --- Square style: a lifted square cover, controls underneath -----------------------------------
@@ -203,7 +213,8 @@ private fun SquareLayout(
     onFavorite: () -> Unit,
     onShare: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    onSleepTimer: () -> Unit
+    onSleepTimer: () -> Unit,
+    onAudioMode: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 64.dp)
@@ -233,12 +244,15 @@ private fun SquareLayout(
                     Text(song.title, style = MaterialTheme.typography.titleLarge, color = NpContent, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(song.artist, style = MaterialTheme.typography.bodyMedium, color = NpContent70, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                NpSquareAction(Icons.Outlined.Share, "Share", onShare)
-                NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
-            NpSquareAction(Icons.Outlined.Bedtime, "Sleep timer", onSleepTimer)
             }
             NpSeekBar(controller, state.durationMs, Modifier.fillMaxWidth())
             NpTransport(state, controller, tint, Modifier.fillMaxWidth(), playSquare = true)
+            Row(modifier = Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+                NpSquareAction(Icons.Outlined.Share, "Share", onShare)
+                NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
+                NpSquareAction(Icons.Outlined.Bedtime, "Sleep timer", onSleepTimer)
+                NpSquareAction(Icons.Outlined.GraphicEq, "Audio mode", onAudioMode)
+            }
         }
     }
 }
@@ -256,7 +270,8 @@ private fun RoundLayout(
     onFavorite: () -> Unit,
     onShare: () -> Unit,
     onAddToPlaylist: () -> Unit,
-    onSleepTimer: () -> Unit
+    onSleepTimer: () -> Unit,
+    onAudioMode: () -> Unit
 ) {
     Column(
         modifier = Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().padding(bottom = 40.dp),
@@ -289,6 +304,7 @@ private fun RoundLayout(
             NpSquareAction(Icons.Outlined.Share, "Share", onShare)
             NpSquareAction(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist)
             NpSquareAction(Icons.Outlined.Bedtime, "Sleep timer", onSleepTimer)
+            NpSquareAction(Icons.Outlined.GraphicEq, "Audio mode", onAudioMode)
         }
     }
 }
@@ -356,7 +372,7 @@ private fun FlowerCard(song: AudioItem, controller: AudioPlayerController, side:
     val position = controller.positionMs.collectAsStateWithLifecycle()
     val target = (position.value.toFloat() / durationMs.coerceAtLeast(1L).toFloat()).coerceIn(0f, 1f)
     // Smooths the 500 ms position ticks so the line grows continuously.
-    val progress = animateFloatAsState(target, tween(500, easing = LinearEasing), label = "ringProgress")
+    val progress = animateFloatAsState(target, tween(1000, easing = LinearEasing), label = "ringProgress")
 
     Box(modifier = Modifier.size(side), contentAlignment = Alignment.Center) {
         AudioArt(
@@ -537,8 +553,8 @@ private fun NpTransport(
             onClick = controller::previous
         )
         NpRoundControl(
-            if (state.isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-            if (state.isPlaying) "Pause" else "Play", big,
+            if (state.wantsPlay) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+            if (state.wantsPlay) "Pause" else "Play", big,
             container = NpContent, tint = tint, shape = playShape, onClick = controller::togglePlayPause
         )
         NpRoundControl(
@@ -572,16 +588,18 @@ private fun NpRoundControl(
         modifier = Modifier
             .size(size)
             .clip(shape)
-            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, onClick = onClick)
+            .bouncyClickable(enabled = enabled, pressedScale = 0.92f, bouncy = false, onClick = onClick)
             .background(container),
         contentAlignment = Alignment.Center
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = description,
-            tint = if (enabled) tint else tint.copy(alpha = 0.35f),
-            modifier = Modifier.size(size * 0.5f)
-        )
+        Crossfade(targetState = icon, animationSpec = tween(120), label = "npIcon") { shown ->
+            Icon(
+                imageVector = shown,
+                contentDescription = description,
+                tint = if (enabled) tint else tint.copy(alpha = 0.35f),
+                modifier = Modifier.size(size * 0.5f)
+            )
+        }
     }
 }
 
