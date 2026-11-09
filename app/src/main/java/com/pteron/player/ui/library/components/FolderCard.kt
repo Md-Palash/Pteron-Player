@@ -50,6 +50,7 @@ fun FolderCard(
     showVideoCount: Boolean,
     showFolderSize: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val folderColor = LocalThemeColors.current.folder
@@ -68,6 +69,7 @@ fun FolderCard(
 
         PteronClickableCard(
             onClick = onClick,
+        onLongClick = onLongClick,
             modifier = Modifier.fillMaxWidth().aspectRatio(1.65f),
             shape = RoundedCornerShape(12.dp),
             color = folderColor,
@@ -143,10 +145,12 @@ fun FolderListRow(
     showVideoCount: Boolean,
     showFolderSize: Boolean,
     onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     PteronClickableCard(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         color = LocalThemeColors.current.folder,
