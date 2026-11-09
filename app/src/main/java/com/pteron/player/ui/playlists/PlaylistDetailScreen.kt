@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Delete
@@ -48,6 +49,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.FullScreenMessage
@@ -71,6 +73,7 @@ fun PlaylistDetailScreen(
     val state by viewModel.uiState.collectAsState()
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
+    var showPicker by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
 
     // Deleting the playlist (from here or elsewhere) closes this page.
@@ -94,13 +97,19 @@ fun PlaylistDetailScreen(
                     }
                     TwoLineTitle(subtitle = "PLAYLIST", title = state.name)
                 }
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                CircularActionButton(
+                    icon = Icons.Outlined.Add,
+                    contentDescription = "Add videos",
+                    onClick = { showPicker = true }
+                )
                 Box {
                     CircularActionButton(
                         icon = Icons.Outlined.MoreVert,
                         contentDescription = "Playlist options",
                         onClick = { menuOpen = true }
                     )
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
                             text = { Text("Rename") },
                             leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
@@ -119,6 +128,7 @@ fun PlaylistDetailScreen(
                         )
                     }
                 }
+                }
             }
 
             when {
@@ -126,7 +136,9 @@ fun PlaylistDetailScreen(
                 state.videos.isEmpty() -> FullScreenMessage(
                     icon = Icons.Outlined.PlaylistRemove,
                     title = "This playlist is empty",
-                    description = "Open the ⋮ menu on any video and choose Add to playlist.",
+                    description = "Tap + to add videos, or open the ⋮ menu on any video and choose Add to playlist.",
+                    actionLabel = "Add videos",
+                    onAction = { showPicker = true },
                     modifier = Modifier.fillMaxSize()
                 )
                 else -> {
@@ -198,6 +210,13 @@ fun PlaylistDetailScreen(
         }
     }
 
+    if (showPicker) {
+        PickVideosSheet(
+            existing = state.videos.map { it.id }.toSet(),
+            onAdd = viewModel::addVideos,
+            onDismiss = { showPicker = false }
+        )
+    }
     if (showRename) {
         PlaylistNameDialog(
             title = "Rename playlist",

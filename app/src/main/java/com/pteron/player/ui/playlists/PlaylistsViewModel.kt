@@ -94,6 +94,10 @@ class PlaylistDetailViewModel(
         viewModelScope.launch { repository.delete(playlistId) }
     }
 
+    fun addVideos(ids: List<Long>) {
+        viewModelScope.launch { ids.forEach { repository.addVideo(playlistId, it) } }
+    }
+
     fun remove(video: VideoItem) {
         viewModelScope.launch { repository.removeVideo(playlistId, video.id) }
     }

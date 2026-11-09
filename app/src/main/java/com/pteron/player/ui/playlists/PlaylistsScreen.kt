@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.Playlist
 import com.pteron.player.ui.common.CircularActionButton
 import com.pteron.player.ui.common.DarkModeButton
@@ -224,7 +225,7 @@ private fun PlaylistCard(
             IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(28.dp)) {
                 Icon(Icons.Outlined.MoreVert, contentDescription = "More options", tint = Color.White, modifier = Modifier.size(16.dp))
             }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+            PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
                     text = { Text("Rename") },
                     leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
