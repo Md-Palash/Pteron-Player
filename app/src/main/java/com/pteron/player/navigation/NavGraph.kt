@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
@@ -90,8 +91,10 @@ private fun NavHostController.navigateToTab(destination: BottomNavDestination) {
  * built-in default is a 700 ms fade, which made returning from a folder or the player feel sluggish;
  * these are short and the incoming screen waits a beat so the two never muddy each other.
  */
-private const val NavMs = 240
-private val navEase = FastOutSlowInEasing
+private const val NavMs = 260
+
+// A strong ease-out: moves fast at the start and settles softly, so a short transition still feels smooth.
+private val navEase = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 
 private fun tabIndex(route: String?): Int = BottomNavDestination.entries.indexOfFirst { it.screen.route == route }
 
@@ -114,8 +117,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): Ent
         return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
     }
     return slideInHorizontally(tween(NavMs, easing = navEase)) { dir * it / 5 } +
-        fadeIn(tween(180, easing = navEase)) +
-        scaleIn(tween(NavMs, easing = navEase), initialScale = 0.97f)
+        fadeIn(tween(180, easing = navEase))
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): ExitTransition {
@@ -146,8 +148,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopExitFor(): E
     val dir = tabDirection()
     if (dir == 0) return fadeOut(tween(160, easing = navEase))
     return slideOutHorizontally(tween(NavMs, easing = navEase)) { -dir * it / 3 } +
-        fadeOut(tween(NavMs - 60, easing = navEase)) +
-        scaleOut(tween(NavMs, easing = navEase), targetScale = 0.97f)
+        fadeOut(tween(NavMs - 60, easing = navEase))
 }
 
 // The video surface cannot slide, scale or fade with the rest of the screen, so the player only
@@ -158,16 +159,14 @@ private val playerPopExit = fadeOut(tween(120))
 // Pushed pages (Folder, playlists, artist): the page slides in from the right while fading up and
 // settling from slightly smaller; the page underneath drifts left a little (parallax).
 private val pushEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
-    fadeIn(tween(180, easing = navEase)) +
-    scaleIn(tween(NavMs, easing = navEase), initialScale = 0.96f)
+    fadeIn(tween(180, easing = navEase))
 private val pushExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 
 // Going back mirrors going forward: the page being left slides out to the right while it fades and
 // shrinks a little, and the page underneath drifts back in from the left.
 private val popEnter = slideInHorizontally(animationSpec = tween(NavMs, easing = navEase)) { -it / 12 }
 private val popExit = slideOutHorizontally(animationSpec = tween(NavMs, easing = navEase)) { it / 5 } +
-    fadeOut(tween(170, easing = navEase)) +
-    scaleOut(tween(NavMs, easing = navEase), targetScale = 0.96f)
+    fadeOut(tween(170, easing = navEase))
 
 @UnstableApi
 @Composable
