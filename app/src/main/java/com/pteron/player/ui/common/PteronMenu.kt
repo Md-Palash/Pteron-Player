@@ -7,7 +7,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.material3.Text
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 
 /** The app's "..." menu: a rounded card in the theme's card shade with a soft outline. */
 @Composable
@@ -28,4 +30,10 @@ fun PteronMenu(
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         content = content
     )
+}
+
+/** The label of a "..." menu entry: a little larger than Material's default. */
+@Composable
+fun MenuText(text: String) {
+    Text(text, fontSize = 16.sp)
 }

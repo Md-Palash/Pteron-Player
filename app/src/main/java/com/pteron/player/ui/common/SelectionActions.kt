@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.DriveFileMove
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -71,17 +72,20 @@ fun SelectionBar(
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
-    val size = 42.dp
+    val size = 40.dp
     Row(
         modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        TwoLineTitle(subtitle = "SELECTED", title = "$count")
-        Row(horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            CircularActionButton(Icons.Outlined.Close, "Cancel selection", onClose, size = size)
+            TwoLineTitle(subtitle = "SELECTED", title = "$count")
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
             SelectAllTick(allSelected, size) { if (allSelected) onClose() else onSelectAll() }
             CircularActionButton(Icons.Outlined.PlaylistAdd, "Add to playlist", onAddToPlaylist, size = size)
-            if (onMove != null) CircularActionButton(Icons.Outlined.FolderOpen, "Move to folder", onMove, size = size)
+            if (onMove != null) CircularActionButton(Icons.Outlined.DriveFileMove, "Move to folder", onMove, size = size)
             CircularActionButton(Icons.Outlined.Share, "Share", onShare, size = size)
             if (onDelete != null) CircularActionButton(Icons.Outlined.DeleteOutline, "Delete", onDelete, size = size)
         }
