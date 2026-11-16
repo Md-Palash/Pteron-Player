@@ -14,12 +14,21 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
+    }
 
-        // The FFmpeg decoder ships a native library per CPU type. Phones are ARM; the x86 builds are
-        // only for emulators and would roughly double the native size of a single APK.
-        // For the smallest APK keep only "arm64-v8a" (drops very old 32-bit-only phones).
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+    // One APK per CPU type. The FFmpeg decoder ships a native library for every CPU type, and a
+    // single APK carries all of them; a split APK carries only the one its phone needs, which cuts
+    // a large part of the download and install size. Most phones from the last years are
+    // "arm64-v8a"; "armeabi-v7a" is for older 32-bit phones. Files are named
+    // app-arm64-v8a-<type>.apk and app-armeabi-v7a-<type>.apk. Set `isUniversalApk = false` to also
+    // get one APK for every phone (it carries every CPU type, so it is the big one).
+    // (A Play Store AAB does this automatically; splits only affect APK builds.)
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
         }
     }
 
