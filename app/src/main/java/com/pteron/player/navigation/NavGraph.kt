@@ -122,6 +122,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterFor(): Ent
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): ExitTransition {
     val dir = tabDirection()
+    if (targetState.isPlayer()) return ExitTransition.None
     if (dir == 0) {
         if (targetState.destination.route == Screen.NowPlaying.route) return ExitTransition.None
         return slideOutHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
@@ -137,6 +138,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitFor(): Exit
 // shrinks a little) and reveals the Library underneath.
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopEnterFor(): EnterTransition {
     val dir = tabDirection()
+    if (initialState.isPlayer()) return EnterTransition.None
     if (dir == 0) {
         if (initialState.destination.route == Screen.NowPlaying.route) return EnterTransition.None
         return slideInHorizontally(tween(NavMs, easing = navEase)) { -it / 12 }
@@ -154,7 +156,18 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabPopExitFor(): E
 // The video surface cannot slide, scale or fade with the rest of the screen, so the player only
 // fades in and out (short) instead of moving.
 private val playerEnter = fadeIn(tween(190, easing = navEase))
-private val playerPopExit = fadeOut(tween(120))
+private val playerPopExit = fadeOut(tween(150, easing = navEase))
+
+private fun NavBackStackEntry.isPlayer(): Boolean =
+    destination.route == Screen.Player.route || destination.route == Screen.ExternalPlayer.route
+
+// The video surface cannot slide, so the screens around the player stay still and only cross-fade
+// with it: nothing moves under the picture while it appears or disappears.
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.pushExitFor(): ExitTransition =
+    if (targetState.isPlayer()) ExitTransition.None else pushExit
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.popEnterFor(): EnterTransition =
+    if (initialState.isPlayer()) EnterTransition.None else popEnter
 
 // Pushed pages (Folder, playlists, artist): the page slides in from the right while fading up and
 // settling from slightly smaller; the page underneath drifts left a little (parallax).
@@ -275,8 +288,8 @@ fun PteronNavGraph(
             route = Screen.AudioArtist.route,
             arguments = listOf(navArgument("artist") { type = NavType.StringType }),
             enterTransition = { pushEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { popExit }
         ) { backStackEntry ->
             AudioArtistScreen(
@@ -292,8 +305,8 @@ fun PteronNavGraph(
             route = Screen.AudioPlaylist.route,
             arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
             enterTransition = { pushEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { popExit }
         ) { backStackEntry ->
             val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
@@ -338,8 +351,8 @@ fun PteronNavGraph(
             route = Screen.PlaylistDetail.route,
             arguments = listOf(navArgument("playlistId") { type = NavType.LongType }),
             enterTransition = { pushEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { popExit }
         ) { backStackEntry ->
             val playlistId = backStackEntry.arguments?.getLong("playlistId") ?: return@composable
@@ -376,8 +389,8 @@ fun PteronNavGraph(
                 navArgument("folderName") { type = NavType.StringType }
             ),
             enterTransition = { pushEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { popExit }
         ) { backStackEntry ->
             val bucketId = backStackEntry.arguments?.getString("bucketId").orEmpty()
@@ -413,8 +426,8 @@ fun PteronNavGraph(
                 }
             ),
             enterTransition = { playerEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { playerPopExit }
         ) { backStackEntry ->
             val videoId = backStackEntry.arguments?.getLong("videoId") ?: return@composable
@@ -435,8 +448,8 @@ fun PteronNavGraph(
             route = Screen.ExternalPlayer.route,
             arguments = listOf(navArgument("uri") { type = NavType.StringType }),
             enterTransition = { playerEnter },
-            exitTransition = { pushExit },
-            popEnterTransition = { popEnter },
+            exitTransition = { pushExitFor() },
+            popEnterTransition = { popEnterFor() },
             popExitTransition = { playerPopExit }
         ) { backStackEntry ->
             val uri = backStackEntry.arguments?.getString("uri") ?: return@composable
