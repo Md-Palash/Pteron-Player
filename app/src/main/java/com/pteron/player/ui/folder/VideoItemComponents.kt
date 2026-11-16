@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.MenuText
 import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.ui.common.ThumbnailImage
@@ -403,7 +404,7 @@ private fun VideoOverflowMenu(
         PteronMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
             if (onAddToPlaylist != null) {
                 DropdownMenuItem(
-                    text = { Text("Add to playlist") },
+                    text = { MenuText("Add to playlist") },
                     leadingIcon = { Icon(Icons.Outlined.PlaylistAdd, contentDescription = null) },
                     onClick = {
                         onAddToPlaylist()
@@ -412,7 +413,7 @@ private fun VideoOverflowMenu(
                 )
             }
             DropdownMenuItem(
-                text = { Text(if (video.isWatched) "Mark as unwatched" else "Mark as watched") },
+                text = { MenuText(if (video.isWatched) "Mark as unwatched" else "Mark as watched") },
                 leadingIcon = {
                     Icon(
                         if (video.isWatched) Icons.Outlined.VisibilityOff else Icons.Filled.Check,
@@ -426,7 +427,7 @@ private fun VideoOverflowMenu(
             )
             if (video.lastPositionMs > 0L) {
                 DropdownMenuItem(
-                    text = { Text("Clear progress") },
+                    text = { MenuText("Clear progress") },
                     leadingIcon = { Icon(Icons.Outlined.RemoveCircleOutline, contentDescription = null) },
                     onClick = {
                         onClearProgress()

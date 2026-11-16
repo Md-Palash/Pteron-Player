@@ -72,7 +72,7 @@ fun MoveToFolderSheet(videos: List<VideoItem>, onPick: (relativePath: String) ->
         ) {
             Text(
                 "Move $label to...",
-                style = MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleLarge,
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
             )
             TargetRow(Icons.Outlined.CreateNewFolder, "New folder", null) { showNew = true }
@@ -123,15 +123,15 @@ private fun TargetRow(icon: ImageVector, label: String, supporting: String?, onC
         shape = RoundedCornerShape(16.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 15.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = scheme.primary, modifier = Modifier.size(26.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(label, style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (supporting != null) {
-                    Text(supporting, style = MaterialTheme.typography.bodySmall, color = scheme.onSurfaceVariant)
+                    Text(supporting, style = MaterialTheme.typography.bodyMedium, color = scheme.onSurfaceVariant)
                 }
             }
         }

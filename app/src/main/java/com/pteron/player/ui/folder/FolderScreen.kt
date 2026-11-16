@@ -22,6 +22,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.pteron.player.ui.common.rememberStaggerGate
+import com.pteron.player.ui.common.staggerIn
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -38,6 +42,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +86,7 @@ fun FolderScreen(
     val uiState by viewModel.uiState.collectAsState()
     // `visibleVideos` filters and sorts the whole list on every read, so compute it once per state.
     val visibleVideos = remember(uiState) { uiState.visibleVideos }
+    val gate = rememberStaggerGate()
 
     // Multi-select: long press a video to start, tap to add or remove, back to cancel.
     var selectedIds by remember { mutableStateOf(setOf<Long>()) }
@@ -103,6 +109,14 @@ fun FolderScreen(
         )
     }
     BackHandler(enabled = selectionMode) { selectedIds = emptySet() }
+    // Videos that were deleted or moved away can no longer stay selected.
+    LaunchedEffect(uiState.videos) {
+        if (selectedIds.isNotEmpty()) {
+            val present = uiState.videos.mapTo(HashSet()) { it.id }
+            val kept = selectedIds.filterTo(HashSet()) { it in present }
+            if (kept.size != selectedIds.size) selectedIds = kept
+        }
+    }
     if (showMultiPlaylist) {
         AddVideosToPlaylistSheet(
             videos = selectedVideos,
@@ -219,8 +233,9 @@ when {
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(visibleVideos, key = { it.id }) { video ->
+                        itemsIndexed(visibleVideos, key = { _, v -> v.id }) { index, video ->
                             VideoGridTile(
+                                modifier = Modifier.staggerIn(index, gate),
                                 video = video,
                                 onClick = {
                                     if (selectionMode) {
@@ -245,8 +260,9 @@ when {
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(visibleVideos, key = { it.id }) { video ->
+                        itemsIndexed(visibleVideos, key = { _, v -> v.id }) { index, video ->
                             VideoListRow(
+                                modifier = Modifier.staggerIn(index, gate),
                                 video = video,
                                 onClick = {
                                     if (selectionMode) {
