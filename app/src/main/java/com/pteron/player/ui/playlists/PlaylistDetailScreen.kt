@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import com.pteron.player.ui.common.rememberStaggerGate
+import com.pteron.player.ui.common.staggerIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
@@ -49,6 +51,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.MenuText
 import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.VideoItem
 import com.pteron.player.ui.common.CircularActionButton
@@ -71,6 +74,7 @@ fun PlaylistDetailScreen(
     onPlay: (video: VideoItem, shuffle: Boolean) -> Unit
 ) {
     val state by viewModel.uiState.collectAsState()
+    val gate = rememberStaggerGate()
     var menuOpen by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showPicker by remember { mutableStateOf(false) }
@@ -111,7 +115,7 @@ fun PlaylistDetailScreen(
                     )
                     PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                         DropdownMenuItem(
-                            text = { Text("Rename") },
+                            text = { MenuText("Rename") },
                             leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -119,7 +123,7 @@ fun PlaylistDetailScreen(
                             }
                         )
                         DropdownMenuItem(
-                            text = { Text("Delete playlist") },
+                            text = { MenuText("Delete playlist") },
                             leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                             onClick = {
                                 menuOpen = false
@@ -176,6 +180,7 @@ fun PlaylistDetailScreen(
                         itemsIndexed(videos, key = { _, video -> video.id }) { index, video ->
                             // The same list row as the Videos tab; the playlist actions join its "..." menu.
                             VideoListRow(
+                                modifier = Modifier.staggerIn(index, gate),
                                 video = video,
                                 onClick = { onPlay(video, false) },
                                 onToggleFavorite = { viewModel.toggleFavorite(video) },
@@ -184,20 +189,20 @@ fun PlaylistDetailScreen(
                                 extraMenuItems = { dismiss ->
                                     if (index > 0) {
                                         DropdownMenuItem(
-                                            text = { Text("Move up") },
+                                            text = { MenuText("Move up") },
                                             leadingIcon = { Icon(Icons.Outlined.ArrowUpward, contentDescription = null) },
                                             onClick = { dismiss(); viewModel.move(video, -1) }
                                         )
                                     }
                                     if (index < videos.lastIndex) {
                                         DropdownMenuItem(
-                                            text = { Text("Move down") },
+                                            text = { MenuText("Move down") },
                                             leadingIcon = { Icon(Icons.Outlined.ArrowDownward, contentDescription = null) },
                                             onClick = { dismiss(); viewModel.move(video, 1) }
                                         )
                                     }
                                     DropdownMenuItem(
-                                        text = { Text("Remove from playlist") },
+                                        text = { MenuText("Remove from playlist") },
                                         leadingIcon = { Icon(Icons.Outlined.PlaylistRemove, contentDescription = null) },
                                         onClick = { dismiss(); viewModel.remove(video) }
                                     )

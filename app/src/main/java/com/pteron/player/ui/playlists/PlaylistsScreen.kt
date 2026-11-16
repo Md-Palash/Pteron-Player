@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import com.pteron.player.ui.common.rememberStaggerGate
+import com.pteron.player.ui.common.staggerIn
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,6 +49,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.MenuText
 import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.Playlist
 import com.pteron.player.ui.common.CircularActionButton
@@ -67,6 +71,7 @@ fun PlaylistsScreen(
     onToggleDarkMode: () -> Unit
 ) {
     val playlists by viewModel.playlists.collectAsState()
+    val gate = rememberStaggerGate()
     var showCreate by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<Playlist?>(null) }
     var deleteTarget by remember { mutableStateOf<Playlist?>(null) }
@@ -113,8 +118,9 @@ fun PlaylistsScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        items(list, key = { it.id }) { playlist ->
+                        itemsIndexed(list, key = { _, p -> p.id }) { index, playlist ->
                             PlaylistCard(
+                                modifier = Modifier.staggerIn(index, gate),
                                 playlist = playlist,
                                 onClick = { onOpenPlaylist(playlist.id) },
                                 onRename = { renameTarget = playlist },
@@ -173,13 +179,14 @@ private fun PlaylistCard(
     playlist: Playlist,
     onClick: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     val count = playlist.videoIds.size
     PteronClickableCard(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().aspectRatio(1.45f),
+        modifier = modifier.fillMaxWidth().aspectRatio(1.45f),
         shape = RoundedCornerShape(18.dp)
     ) {
         val firstVideoId = playlist.videoIds.firstOrNull()
@@ -227,12 +234,12 @@ private fun PlaylistCard(
             }
             PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(
-                    text = { Text("Rename") },
+                    text = { MenuText("Rename") },
                     leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                     onClick = { menuOpen = false; onRename() }
                 )
                 DropdownMenuItem(
-                    text = { Text("Delete") },
+                    text = { MenuText("Delete") },
                     leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                     onClick = { menuOpen = false; onDelete() }
                 )
