@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.pteron.player.ui.common.MenuText
 import com.pteron.player.ui.common.PteronMenu
 import com.pteron.player.data.model.AudioItem
 import com.pteron.player.playback.AudioPlayerController
@@ -117,12 +118,12 @@ fun AudioPlaylistScreen(
                 CircularActionButton(Icons.Outlined.MoreVert, "Playlist options", onClick = { menuOpen = true })
                 PteronMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Rename") },
+                        text = { MenuText("Rename") },
                         leadingIcon = { Icon(Icons.Outlined.Edit, contentDescription = null) },
                         onClick = { menuOpen = false; showRename = true }
                     )
                     DropdownMenuItem(
-                        text = { Text("Delete playlist") },
+                        text = { MenuText("Delete playlist") },
                         leadingIcon = { Icon(Icons.Outlined.Delete, contentDescription = null) },
                         onClick = { menuOpen = false; showDelete = true }
                     )

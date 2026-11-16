@@ -27,6 +27,9 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import com.pteron.player.ui.common.rememberStaggerGate
+import com.pteron.player.ui.common.staggerIn
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
@@ -367,6 +370,7 @@ private fun SongGrid(
     onPlay: (List<AudioItem>, Int) -> Unit,
     onMenu: (AudioItem) -> Unit
 ) {
+    val gate = rememberStaggerGate()
     if (songs.isEmpty()) {
         EmptyHint(emptyText, Modifier.padding(top = topPadding))
         return
@@ -380,13 +384,19 @@ private fun SongGrid(
     ) {
         items(songs.size, key = { songs[it].id }) { index ->
             val song = songs[index]
-            SongCard(song = song, onClick = { onPlay(songs, index) }, onMenu = { onMenu(song) })
+            SongCard(
+                song = song,
+                onClick = { onPlay(songs, index) },
+                onMenu = { onMenu(song) },
+                modifier = Modifier.staggerIn(index, gate)
+            )
         }
     }
 }
 
 @Composable
 private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, topPadding: androidx.compose.ui.unit.Dp, onOpenPlaylist: (Long) -> Unit) {
+    val gate = rememberStaggerGate()
     if (state.playlists.isEmpty()) {
         EmptyHint("No playlists yet. Tap + to create one, then add songs from the \u22EE menu on any song.", Modifier.padding(top = topPadding))
         return
@@ -399,9 +409,10 @@ private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(state.playlists, key = { it.id }) { playlist ->
+        itemsIndexed(state.playlists, key = { _, p -> p.id }) { index, playlist ->
             val count = playlist.videoIds.size
             CollectionCard(
+                modifier = Modifier.staggerIn(index, gate),
                 title = playlist.name,
                 subtitle = "$count song${if (count == 1) "" else "s"}",
                 coverUri = playlist.videoIds.firstNotNullOfOrNull { byId[it] }?.contentUri,
@@ -414,6 +425,7 @@ private fun PlaylistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui
 
 @Composable
 private fun ArtistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.unit.Dp, topPadding: androidx.compose.ui.unit.Dp, onOpenArtist: (String) -> Unit) {
+    val gate = rememberStaggerGate()
     if (state.artists.isEmpty()) {
         EmptyHint("No artists found.", Modifier.padding(top = topPadding))
         return
@@ -425,8 +437,9 @@ private fun ArtistGrid(state: AudioUiState, bottomPadding: androidx.compose.ui.u
         verticalArrangement = Arrangement.spacedBy(14.dp),
         modifier = Modifier.fillMaxSize()
     ) {
-        items(state.artists, key = { it.name }) { artist ->
+        itemsIndexed(state.artists, key = { _, a -> a.name }) { index, artist ->
             CollectionCard(
+                modifier = Modifier.staggerIn(index, gate),
                 title = artist.name,
                 subtitle = "${artist.songCount} song${if (artist.songCount == 1) "" else "s"}",
                 coverUri = artist.coverContentUri,
