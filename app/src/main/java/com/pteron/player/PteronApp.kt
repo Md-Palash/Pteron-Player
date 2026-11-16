@@ -15,6 +15,7 @@ import com.pteron.player.data.prefs.AudioStateRepository
 import com.pteron.player.data.prefs.MusicPrefsRepository
 import com.pteron.player.data.prefs.PlaylistRepository
 import com.pteron.player.playback.AudioPlayerController
+import com.pteron.player.util.CrashLog
 
 /**
  * Manual dependency container. The app intentionally avoids a DI framework
@@ -25,6 +26,11 @@ import com.pteron.player.playback.AudioPlayerController
  * the cold-start path until a screen actually needs it, so the first frame appears sooner.
  */
 class PteronApp : Application(), ImageLoaderFactory {
+
+    override fun onCreate() {
+        super.onCreate()
+        CrashLog.install(this)
+    }
 
     val mediaStoreRepository: MediaStoreRepository by lazy { MediaStoreRepository(this) }
     val appearancePrefsRepository: AppearancePrefsRepository by lazy { AppearancePrefsRepository(this) }
@@ -62,6 +68,8 @@ class PteronApp : Application(), ImageLoaderFactory {
                     .maxSizePercent(0.12)
                     .build()
             }
+            // Thumbnails don't need 32-bit color: half the memory per picture, and less to draw.
+            .allowRgb565(true)
             .crossfade(150)
             .build()
 }

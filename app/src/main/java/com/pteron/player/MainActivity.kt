@@ -11,7 +11,19 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
+import com.pteron.player.util.CrashLog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.collectAsState
@@ -65,6 +77,33 @@ class MainActivity : ComponentActivity() {
             val externalVideo by pendingExternalVideo.collectAsState()
 
             PteronTheme(settings = appTheme) {
+                // If the app closed unexpectedly last time, show why (so it can be fixed).
+                var crashText by remember { mutableStateOf(CrashLog.read(this@MainActivity)) }
+                crashText?.let { text ->
+                    AlertDialog(
+                        onDismissRequest = {},
+                        title = { Text("The app closed unexpectedly") },
+                        text = {
+                            Column(Modifier.heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
+                                Text(text.take(3_000), style = MaterialTheme.typography.bodySmall)
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                runCatching {
+                                    val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                                    startActivity(Intent.createChooser(send, "Share crash log"))
+                                }
+                            }) { Text("Share log") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                CrashLog.clear(this@MainActivity)
+                                crashText = null
+                            }) { Text("Dismiss") }
+                        }
+                    )
+                }
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
