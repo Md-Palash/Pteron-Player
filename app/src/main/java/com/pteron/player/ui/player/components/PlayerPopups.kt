@@ -1,9 +1,7 @@
 package com.pteron.player.ui.player.components
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -11,10 +9,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
@@ -35,22 +33,31 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.pteron.player.ui.player.TrackOption
 
 private val speedOptions = listOf(0.5f, 0.75f, 1.0f, 1.25f, 1.5f, 1.75f, 2.0f)
 
+/** Same width for the audio-track and the subtitle card. */
+private val TrackCardWidth = 260.dp
+private val SpeedCardWidth = 150.dp
+
 /**
- * A small rounded card that floats over the video next to the button that opened it (instead of a
- * full-width bottom sheet). Tapping anywhere outside closes it.
+ * A rounded card that floats over the video next to the button that opened it (instead of a
+ * full-width bottom sheet). Tapping anywhere outside closes it. It is drawn above every other
+ * layer of the player, and fades with a plain alpha instead of a layout animation.
  */
 @Composable
 private fun BoxScope.PlayerPopup(
@@ -62,49 +69,54 @@ private fun BoxScope.PlayerPopup(
     topPadding: Dp,
     bottomPadding: Dp,
     width: Dp,
+    maxHeight: Dp,
     onDismiss: () -> Unit,
-    content: @Composable () -> Unit
+    content: @Composable ColumnScope.() -> Unit
 ) {
-    AnimatedVisibility(
-        visible = visible,
-        enter = fadeIn(tween(110)),
-        exit = fadeOut(tween(80)),
-        modifier = Modifier.matchParentSize()
-    ) {
+    val alpha by animateFloatAsState(
+        targetValue = if (visible) 1f else 0f,
+        animationSpec = tween(if (visible) 120 else 80),
+        label = "playerPopupAlpha"
+    )
+    if (visible || alpha > 0.01f) {
         Box(
             modifier = Modifier
-                .fillMaxSize()
+                .matchParentSize()
+                .zIndex(10f)
+                .graphicsLayer { this.alpha = alpha }
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
                 .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Horizontal + edgeInsets))
                 .padding(start = startPadding, end = endPadding, top = topPadding, bottom = bottomPadding)
         ) {
             Surface(
                 modifier = Modifier.align(alignment).width(width),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(22.dp),
                 color = MaterialTheme.colorScheme.surfaceContainer,
-                shadowElevation = 12.dp
+                shadowElevation = 14.dp
             ) {
                 Column(
                     modifier = Modifier
-                        .heightIn(max = 260.dp)
+                        .heightIn(max = maxHeight)
                         .verticalScroll(rememberScrollState())
-                        .padding(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) { content() }
+                        .padding(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                    content = content
+                )
             }
         }
     }
 }
 
-/** Playback speed: a narrow card at the bottom left, just above the speed button. */
+/** Playback speed: a card at the bottom left, just above the speed button. */
 @Composable
 fun BoxScope.SpeedPopup(visible: Boolean, currentSpeed: Float, onSelect: (Float) -> Unit, onDismiss: () -> Unit) {
     PlayerPopup(
         visible = visible,
         alignment = Alignment.BottomStart,
         edgeInsets = WindowInsetsSides.Bottom,
-        startPadding = 12.dp, endPadding = 0.dp, topPadding = 0.dp, bottomPadding = 66.dp,
-        width = 112.dp,
+        startPadding = 12.dp, endPadding = 0.dp, topPadding = 0.dp, bottomPadding = 70.dp,
+        width = SpeedCardWidth,
+        maxHeight = 300.dp,
         onDismiss = onDismiss
     ) {
         speedOptions.forEach { speed ->
@@ -113,7 +125,7 @@ fun BoxScope.SpeedPopup(visible: Boolean, currentSpeed: Float, onSelect: (Float)
     }
 }
 
-/** Audio track or subtitles: a compact card at the top right, under the buttons that open it. */
+/** Audio track or subtitles: a card at the top right, under the buttons that open it. */
 @Composable
 fun BoxScope.TrackPopup(
     visible: Boolean,
@@ -128,7 +140,8 @@ fun BoxScope.TrackPopup(
         alignment = Alignment.TopEnd,
         edgeInsets = WindowInsetsSides.Top,
         startPadding = 0.dp, endPadding = 12.dp, topPadding = 52.dp, bottomPadding = 0.dp,
-        width = 210.dp,
+        width = TrackCardWidth,
+        maxHeight = 320.dp,
         onDismiss = onDismiss
     ) {
         if (onLoadExternal != null) {
@@ -140,9 +153,9 @@ fun BoxScope.TrackPopup(
         if (tracks.isEmpty()) {
             Text(
                 "No tracks available.",
-                style = MaterialTheme.typography.bodySmall,
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 10.dp)
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp)
             )
         }
         tracks.forEach { track ->
@@ -158,22 +171,22 @@ private fun PopupRow(label: String, selected: Boolean, leadingIcon: ImageVector?
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
             .background(if (selected) scheme.primary else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 9.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (leadingIcon != null) Icon(leadingIcon, contentDescription = null, tint = content, modifier = Modifier.size(18.dp))
+        if (leadingIcon != null) Icon(leadingIcon, contentDescription = null, tint = content, modifier = Modifier.size(20.dp))
         Text(
             label,
-            style = MaterialTheme.typography.titleSmall,
+            style = MaterialTheme.typography.titleSmall.copy(fontSize = 15.sp),
             color = content,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(16.dp))
+        if (selected) Icon(Icons.Filled.Check, contentDescription = "Selected", tint = content, modifier = Modifier.size(18.dp))
     }
 }
