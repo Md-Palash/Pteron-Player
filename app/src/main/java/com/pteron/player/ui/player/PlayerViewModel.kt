@@ -116,7 +116,7 @@ const val NO_PLAYLIST = -1L
 private const val EXTERNAL_VIDEO_ID = -1L
 
 /** How often the playback position is written to disk while playing. */
-private const val POSITION_SAVE_INTERVAL_MS = 10_000L
+private const val POSITION_SAVE_INTERVAL_MS = 15_000L
 
 /** Speed while the picture is held with a long press. */
 private const val HOLD_SPEED = 2f
@@ -160,11 +160,10 @@ class PlayerViewModel(
         // together with the audio-boost feature below). Falls back silently on devices/paths
         // that don't support float output.
         .setEnableAudioFloatOutput(true)
-        // If an audio decoder extension (e.g. an FFmpeg build for DTS/AC-3/ALAC) is ever added
-        // to the app, prefer it over the platform decoder for formats both can play. With no
-        // extension present -- the default today -- this has no effect; the platform decoders
-        // (AAC, MP3, Opus, Vorbis, FLAC, PCM) already cover the formats most videos use.
-        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_PREFER)
+        // The FFmpeg audio decoder (DTS, AC-3, E-AC-3, TrueHD...) is only used for sound the phone's
+        // own decoders cannot play. The phone's hardware decoders handle everything else: they are
+        // far lighter on the battery than a software decoder.
+        .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
 
     val player: ExoPlayer = ExoPlayer.Builder(application, renderersFactory)
         .setTrackSelector(trackSelector)

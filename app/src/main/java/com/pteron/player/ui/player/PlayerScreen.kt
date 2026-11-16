@@ -190,10 +190,24 @@ fun PlayerScreen(
         }
     }
     val scrubbingNow by rememberUpdatedState(scrubPreviewMs != null)
+    val cardOpenNow by rememberUpdatedState(showSpeedSheet || showAudioSheet || showSubtitleSheet)
 
     // Stops decoding right away, so the heavy player release does not land in the middle of the
     // leave animation (that was the slight freeze when going back).
-    val exitPlayer = remember(viewModel, onBack) { { viewModel.prepareToExit(); onBack() } }
+    val exitPlayer = remember(viewModel, onBack, activity) {
+        {
+            viewModel.prepareToExit()
+            // Bring the system bars (and normal rotation) back right now, behind the fading player,
+            // so the screen underneath is already in its final shape when it is revealed -- not
+            // jumping into place at the very end of the animation.
+            activity?.window?.let { w ->
+                androidx.core.view.WindowCompat.getInsetsController(w, w.decorView)
+                    .show(androidx.core.view.WindowInsetsCompat.Type.systemBars())
+            }
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            onBack()
+        }
+    }
     BackHandler(enabled = !isLocked) { exitPlayer() }
 
     // While locked, system Back must not leave the player: it just shows the unlock button.
@@ -307,13 +321,13 @@ fun PlayerScreen(
             while (true) {
                 val lastActivity = maxOf(shownAt, lastControlsTouchAt[0])
                 val remaining = hideAfterMs - (android.os.SystemClock.uptimeMillis() - lastActivity)
-                if (!scrubbingNow && remaining <= 0L) {
+                if (!scrubbingNow && !cardOpenNow && remaining <= 0L) {
                     controlsVisible = false
                     break
                 }
                 // Sleep until the controls could actually be due to hide, instead of waking up
                 // four times a second; a touch in the meantime just means one more sleep.
-                delay(if (scrubbingNow) 250L else remaining.coerceAtLeast(50L))
+                delay(if (scrubbingNow || cardOpenNow) 250L else remaining.coerceAtLeast(50L))
             }
         }
     }
