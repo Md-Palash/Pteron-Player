@@ -21,6 +21,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.itemsIndexed
+import com.pteron.player.ui.common.rememberStaggerGate
+import com.pteron.player.ui.common.staggerIn
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -196,6 +200,7 @@ private fun LibraryContent(
     settled: Boolean
 ) {
     val filtered = uiState.filteredFolders
+    val gate = rememberStaggerGate()
 
     Column(modifier = Modifier.fillMaxSize()) {
         AnimatedVisibility(visible = settled, enter = fadeIn(tween(160)), modifier = Modifier.fillMaxSize()) {
@@ -240,8 +245,9 @@ private fun LibraryContent(
                 verticalArrangement = Arrangement.spacedBy(14.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(filtered, key = { it.bucketId }) { folder ->
+                itemsIndexed(filtered, key = { _, f -> f.bucketId }) { index, folder ->
                     FolderCard(
+                        modifier = Modifier.staggerIn(index, gate),
                         folder = folder,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
@@ -255,8 +261,9 @@ private fun LibraryContent(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.fillMaxSize()
             ) {
-                items(filtered, key = { it.bucketId }) { folder ->
+                itemsIndexed(filtered, key = { _, f -> f.bucketId }) { index, folder ->
                     FolderListRow(
+                        modifier = Modifier.staggerIn(index, gate),
                         folder = folder,
                         showVideoCount = uiState.appearance.showVideoCountBadge,
                         showFolderSize = uiState.appearance.showFolderSizeBadge,
